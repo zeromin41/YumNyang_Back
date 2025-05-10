@@ -57,6 +57,37 @@ app.post("/SignUp", async (req, res) => {
     }
 });
 
+app.post("/Withdraw", async (req, res) => {
+    const {email, password} = req.body;
+
+    try {
+        const [rows] = await db.query(
+            'SELECT PASSWORD FROM USERS WHERE EMAIL=?',
+            [email]
+        );
+
+        if (rows.length === 0) {
+            return res.status(500).json({ message: "정상적인 접근이 아닙니다." });
+        }
+
+        const hash = rows[0].PASSWORD;
+
+        const valid = await argon2.verify(hash, password);
+
+        if(!valid) return res.status(404).json({ message: "패스워드가 올바르지않습니다." });
+
+        await db.query("DELETE FROM USERS WHERE EMAIL=?", [email]);
+        await db.query("DELETE FROM TOKEN_USER WHERE EMAIL=?", [email]);
+        res.clearCookie('token');
+        
+        return res.status(200).json({message : "회원탈퇴되었습니다."});
+
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({error : "회원탈퇴에 실패했습니다."});
+    }
+});
+
 app.post("/Login", async (req, res) => {
     const { email, password } = req.body;
     
