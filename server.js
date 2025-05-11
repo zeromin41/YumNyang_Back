@@ -1,12 +1,15 @@
 const fs = require("fs");
 const https = require("https");
-const argon2  = require("argon2");
+const argon2  = require("@node-rs/argon2");
 const express = require("express");
 const mariaDB = require("mysql2/promise");
 const axios = require('axios');
 const jwt = require("jsonwebtoken");
 const jwtSecret = process.env.JWT_SECRET;
 const cookieParser = require('cookie-parser');
+const { XMLParser } = require('fast-xml-parser');
+const path = require('path');
+const multer = require('multer');
 
 const app = express();
 app.use(express.json());
@@ -22,6 +25,7 @@ app.use(
     )
 );
 
+require('dotenv').config();
 //https 인증서 위치
 const options = {
     key : fs.readFileSync(process.env.HTTPS_KEY),
@@ -37,11 +41,27 @@ const db = mariaDB.createPool({
     database : process.env.DB_SCHEMA
 });
 
-app.post("/SignUp", async (req, res) => {
+const storage = multer.diskStorage({
+    destination : (req, file, cb) => {
+        cb(null, path.join(__dirname, 'uploads'));
+    },
+    filename : (req, file, cb) => {
+        cb(null, Date.now() + '-' + file.originalname);
+    }
+});
+
+const upload = multer({ storage });
+
+/**
+ * 회원 관리
+ */
+
+ // 회원가입
+app.post("/signUp", async (req, res) => {
     const { email, nickname, password } = req.body;
     try {
         const hashPassword = await argon2.hash(password, {
-            type : argon2.argon2id,
+            type : argon2.ArgonType.argon2id,
             timeCost : process.env.TIME_COST,
             memoryCost : 1 << process.env.MEMORY_COST,
             parallelism : process.env.PARALLELISM
@@ -57,7 +77,8 @@ app.post("/SignUp", async (req, res) => {
     }
 });
 
-app.post("/Withdraw", async (req, res) => {
+// 회원 탈퇴
+app.post("/withdraw", async (req, res) => {
     const {email, password} = req.body;
 
     try {
@@ -80,6 +101,7 @@ app.post("/Withdraw", async (req, res) => {
         await db.query("DELETE FROM TOKEN_USER WHERE EMAIL=?", [email]);
         res.clearCookie('token');
         
+        console.log(`${email}님이 회원을 탈퇴했습니다.`);
         return res.status(200).json({message : "회원탈퇴되었습니다."});
 
     } catch (error) {
@@ -88,7 +110,8 @@ app.post("/Withdraw", async (req, res) => {
     }
 });
 
-app.post("/Login", async (req, res) => {
+// 로그인
+app.post("/login", async (req, res) => {
     const { email, password } = req.body;
     
     try {
@@ -128,6 +151,7 @@ app.post("/Login", async (req, res) => {
             maxAge : 30 * 60 * 1000
         });
 
+        console.log(`${email}님이 로그인했습니다.`);
         return res.status(200).json({ message: `${email}님 환영합니다.` });
     } catch (error) {
         console.error(error);
@@ -135,46 +159,376 @@ app.post("/Login", async (req, res) => {
     }
 });
 
+// 회원 관리
 app.get('/checkToken', authenticateToken, (req, res) => {
-    const payload = { email : req.user.email};
-
-    const newToken = jwt.sign(payload, jwtSecret, {expiresIn : '30m'});
-
-    res.cookie('token', newToken, {
-        httpOnly : true,
-        secure : process.env.NODE_ENV === 'production', // 정식일 땐 true로 교체
-        sameSite : 'strict',
-        maxAge : 30 * 60 * 1000
-    });
-
-    return res.status(200).json({
-        authenticated : true,
-        user : req.user
-    });
-});
-
-app.post('/logout', authenticateToken, async (req, res) => {
-    const email = req.user.email;
-
-    await db.query("DELETE FROM TOKEN_USER WHERE EMAIL=?", [email]);
-
-    res.clearCookie('token');
-    
-    return res.status(200).json({message : "로그아웃되었습니다."});
-});
-
-app.get("/test", async (req, res) => {
     try {
-        const test = await axios.get(`http://api.nongsaro.go.kr/service/feedRawMaterial/upperList/apiKey=${process.env.ANIMAL_FOOD_API}`);
+        const payload = { email : req.user.email};
 
-        console.log(test.data);
-        return res.status(200).json({ test: test.data });
+        const newToken = jwt.sign(payload, jwtSecret, {expiresIn : '30m'});
+
+        res.cookie('token', newToken, {
+            httpOnly : true,
+            secure : process.env.NODE_ENV === 'production', // 정식일 땐 true로 교체
+            sameSite : 'strict',
+            maxAge : 30 * 60 * 1000
+        });
+
+        console.log(`${payload.email}님의 token이 업데이트 되었습니다.`);
+
+        return res.status(200).json({
+            authenticated : true,
+            user : req.user
+        });
     } catch (error) {
         console.error(error);
-        return res.status(404).json({
+        return res.status(500).json({error : "비정상적 접근입니다."});
+    }
+});
+
+// 로그아웃
+app.post('/logout', authenticateToken, async (req, res) => {
+    try {
+        const email = req.user.email;
+
+        await db.query("DELETE FROM TOKEN_USER WHERE EMAIL=?", [email]);
+
+        res.clearCookie('token');
+        
+        console.log(`${email}님이 로그아웃했습니다.`);
+        return res.status(200).json({message : "로그아웃되었습니다."});
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({error : "로그아웃에 실패했습니다."})
+    }
+});
+
+/**
+ * 레시피
+ */
+
+// 카테고리 불러오기
+/**
+ * code : codeNm
+ * 402001 : 농산물
+ * 402002 : 축산물
+ * 402003 : 수산물
+ * 402004 : 부산물
+ * 402005 : 기타
+ */
+app.get("/getCategory", async (req, res) => {
+    try {
+        const options = {
+            ignoreAttributes : false,
+            cdataPropName : "value"
+        };
+
+        const parser = new XMLParser(options);
+
+        const category = await axios.get(`http://api.nongsaro.go.kr/service/feedRawMaterial/upperList?apiKey=${process.env.ANIMAL_FOOD_API}`);
+
+        const jsonObj = parser.parse(category.data);
+
+        const items = jsonObj.response.body.items.item;
+        const cleanItems = items.map(i => ({
+            code : i.code.value,
+            codeNm : i.codeNm.value
+        }));
+
+        console.log("분류 코드 가져오기");
+        return res.status(200).json({ test: cleanItems });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
             message: error.message,
             ...(error.response && { details: error.response.data }),
           });
+    }
+});
+
+// 반려동물 집밥 원료 불러오기
+app.post("/getIngredient", async (req, res) => {
+    try {
+        const options = {
+            ignoreAttributes : true,
+            cdataPropName : "value",
+            parseTagValue : false
+        };
+
+        const { upperListSel } = req.body;
+
+        const parser = new XMLParser(options);
+
+        const test = await axios.get(`http://api.nongsaro.go.kr/service/feedRawMaterial/feedRawMaterialAllList?apiKey=${process.env.ANIMAL_FOOD_API}${upperListSel !== "" ? `&upperListSel=${upperListSel}` : ""}`);
+
+        const jsonObj = parser.parse(test.data);
+
+        const items = jsonObj.response.body.items.item;
+        const cleanItems = items.map(i => {
+            const obj = {};
+            for(const [key, node] of Object.entries(i)){
+                obj[key] = (node && typeof node === 'object' && 'value' in node) ? node.value : node;
+            }
+
+            return obj;
+        });
+
+        console.log("집밥원료 가져오기");
+        return res.status(200).json({ test: cleanItems });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            message: error.message,
+            ...(error.response && { details: error.response.data }),
+          });
+    }
+});
+
+// 레시피 추가
+// 아직 미완성 5/12 완성될 예장
+app.post("/AddRecipe", upload.array('images', 10), async (req, res) => {
+    try {
+        const files = req.files;
+
+        const urls = files.map(f =>
+            `${req.protocol}://${req.get('host')}/uploads/${f.filename}`
+        );
+
+        
+        const {userId, title, mainImage, description, targetPetType, foodCategory, cookingTimeLimit, level, caloriesPerServing, favoritesCount, carbs, protein, fat, calcium, phosphorus, moisture, fiber} = req.body;
+        await db.query(
+            "INSERT INTO RECIPES(USER_ID, TITLE, MAIN_IMAGE_URL, DESCRIPTION, TARGET_PET_TYPE, FOOD_CATEGORY, COOKING_TIME_LIMIT, LEVEL, CALORIES_PER_SERVING, FAVORITES_COUNT, NUTRITIONAL_INFO_CARBS_G, NUTRITIONAL_INFO_PROTEIN_G, NUTRITIONAL_INFO_FAT_G, NUTRITIONAL_INFO_CALCIUM_G, NUTRITIONAL_INFO_PHOSPHORUS_G, NUTRITIONAL_INFO_MOISTURE_PERCENT, NUTRITIONAL_INFO_FIBER_G) VALUE(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            , []);
+
+        console.log("레시피 추가 완료");
+        return res.status(200).json({message : "레시피 추가가 완료되었습니다."});
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({error : "레시피 추가에 실패했습니다."});
+    }
+});
+
+app.post("updateRecipe", upload.array("newImages", 10), async (req, res) => {
+
+});
+
+app.get("/removeRecipe/:id", async (req, res) => {
+    try {
+        const { id } = req.params;
+        const [images] = await db.query("", [id]);
+
+        for(let img of images){
+            const relativePath = img.url.split("/uploads/")[1];
+            const filePath = path.join(__dirname, 'uploads', relativePath);
+
+            if(fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        }
+
+        if(images.length > 0){
+            const imageIds = images.map(i => i.id);
+
+            await db.query("DELETE FROM ");
+        }
+
+        await db.query("DELETE FROM RECIPES WHERE ID=?", [id]);
+
+        return res.status(200).json({message : "레시피가 삭제되었습니다."});
+
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({error : "레시피 삭제에 실패했습니다."});
+    }
+});
+
+
+// 레시피 불러오기
+app.get("/getRecipe/:id", async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const [rows] = await db.query("SELECT * FROM RECIPES WHERE ID=?", [id]);
+
+        if(rows.length === 0) return res.status(404).json({message : "레시피가 존재하지않습니다."});
+
+        rows[0]["VIEW_COUNT"] += 1;
+        await db.query("UPDATE RECIPES SET VIEW_COUNT=? WHERE ID=?", [rows[0]["VIEW_COUNT"], id]);
+
+        console.log(`아이디 ${id} 레시피 불러오기`);
+        return res.status(200).json({recipe : rows[0]});
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({error : "레시피를 불러오는데 실패했습니다."});
+    }
+});
+
+// 레시피 상세 찾기
+app.post("/searchRecipe", async (req, res) => {
+    try {
+        const { pet, food, ingredient } = req.body;
+
+        const [recipeIngredient] = ingredient ? await db.query("SELECT * FROM RECIPE_INGREDIENTS WHERE INGREDIENT_NAME=?", ingredient) : null;
+        const check = [];
+        if(pet) check.push(pet);
+        if(food) check.push(food);
+        const [rows] = await db.query(`SELECT * FROM RECIPES WHERE 1=1 ${pet ? `AND TARGET_PET_TYPE=?` : ""} ${food ? `AND FOOD_CATEGORY=?` : ""}`, check);
+
+        const answer = recipeIngredient === null ? rows.filter(row => {
+            for(let recipe of recipeIngredient){
+                if(recipe["RECIPE_ID"] === row["ID"]) return true;
+            }
+            return false;
+        }) : rows;
+
+        console.log("레시피 상세 찾기");
+        return res.status(200).json({recipe : answer});
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({error : "레시피를 검색하는데 실패했습니다."});
+    }
+});
+
+/**
+ * 리뷰
+ */
+
+// 리뷰 추가
+app.post("/addReview", async (req, res) => {
+    try {
+        const { recipeId, userId, ratingScore, commentText } = req.body;
+
+        await db.query("INSERT INTO REVIEWS(RECIPE_ID, USER_ID, RATING_SCORE, COMMENT_TEXT) VALUES(?, ?, ?, ?)", [recipeId, userId, ratingScore, commentText]);
+
+        console.log(`${userId}님이 ${recipeId}에 리뷰를 등록했습니다.`);
+        return res.status(200).json({message : "리뷰가 정상적으로 등록되었습니다."});
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({error : "리뷰 추가에 실패했습니다."});
+    }
+});
+
+// 리뷰 가져오기
+app.get("/getReview/:recipeId", async (req, res) => {
+    try {
+        const { recipeId } = req.params;
+
+        const [rows] = await db.query("SELECT * FROM REVIEWS FROM RECIPE_ID=?", [recipeId]);
+
+        if(rows.length === 0) return res.status(404).json({error : "리뷰가 없습니다."});
+
+        console.log(`${recipeId}의 리뷰를 가져옵니다.`);
+        return res.status(200).json({review : rows});
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({error : "리뷰 찾기를 실패했습니다"});
+    }
+});
+
+// 리뷰 업데이트
+app.post("/upDateReview", async (req, res) => {
+    const { id, type, ratingScore, commentText } = req.body;
+    try {
+        const [rows] = type === "update" ? await db.query("UPDATE REVIEWS SET RATING_SCORE=? AND COMMENT_TEXT=? FROM WHERE ID=?", [ratingScore, commentText, id])
+                                         : type === "delete" ? await db.query("DELETE FROM REVIEWS WHERE ID=?", [id])
+                                         : null;
+
+        console.log(`리뷰 아이디 ${id}를 ${type === "update" ? "업데이트" : type === "delete" ? "삭제" : "비정상 접근을"} 했습니다.`);
+        return res.status(200).json({message : type === "update" ? "업데이트 성공" : type === "delete" ? "삭제 성공" : "비정상 접근입니다."});
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({error : `${type === "update" ? "리뷰 업데이트를 실패했습니다." : type === "delete" ? "리뷰 삭제를 실패했습니다." : "비정상 접근입니다."}`});
+    }
+});
+
+/**
+ * 즐겨찾기
+ */
+
+//즐겨찾기 추가
+app.post("/addFavorites", async (req, res) => {
+    try {
+        const { userId, recipeId } = req.body;
+        await db.query("INSERT INTO FAVORITES(USER_ID, RECIPE_ID) VALUES(?, ?)", [userId, recipeId]);
+
+        console.log(`${userId}님이 ${recipeId}를 즐겨찾기에 추가했습니다.`);
+        return res.status(200).json({message : "즐겨찾기 추가"});
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({error : "즐겨찾기 추가를 실패했습니다."});
+    }
+});
+
+//즐겨찾기 찾기
+app.get("/getFavorites/:userId", async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        const [rows] = await db.query("SELECT * FROM FAVORITES WHERE USERID=?", [userId]);
+
+        console.log(`${userId}님의 즐겨찾기를 찾았습니다.`);
+        return res.status(200).json({favorites : rows});
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({error : "즐겨찾기를 찾는데 실패했습니다."});
+    }
+});
+
+//즐겨찾기 제거
+app.get("/removeFavorites/:id", async (req, res) => {
+    try {
+        const { id } = req.params;
+        await db.query("DELETE FROM FAVORITES WHERE ID=?", [id]);
+
+        console.log(`즐겨찾기 아이디 ${id} 삭제`);
+        return res.status(200).json({message : "즐겨찾기 삭제"});
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({error : "즐겨찾기 삭제를 실패했습니다."});
+    }
+});
+
+/**
+ * 최근 본 레시피
+ */
+
+// 최근 본 레시피 추가
+app.post("/addRecentlyView", async (req, res) => {
+    try {
+        const { userId, recipeId } = req.body;
+
+        await db.query("INSERT INTO RECENTLY_VIEWED_RECIPES(USER_ID, RECIPE_ID) VALUES(?, ?)", [userId, recipeId]);
+
+        console.log(`${userId}님이 ${recipeId}를 봤습니다.`);
+        return res.status(200).json({message : "최근 본 레시피 추가 완료"});
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({error : "서버에 문제가 발생했습니다."});
+    }
+});
+
+// 최근 본 레시피 불러오기
+app.get("/getRecentlyView/:userId", async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        const [rows] = await db.query("SELECT * FROM RECENTLY_VIEWED_RECIPES WHERE USER_ID=?", userId);
+
+        console.log(`${userId}님의 최근 본 레시피를 불러옵니다.`);
+        return res.status(200).json({recentlyView : rows});
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({error : "서버에 문제가 발생했습니다"});
+    }
+});
+
+// 인기있는 5개의 레시피 보여주기
+app.get("/getPopularity", async (req, res) => {
+    try {
+        const [rows] = await db.query("SELECT * FROM RECIPES ORDER BY VIEW_COUNT DESC LIMIT 5");
+
+        console.log("인기있는 레시피 5개를 추출합니다.");
+        return res.status(200).json({popularity : rows});
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({error : "서버에 문제가 발생했습니다."});
     }
 })
 
@@ -194,6 +548,7 @@ function authenticateToken(req, res, next) {
             res.clearCookie('token');
             return res.status(401).json({message : "다른 곳에서 로그인을 시도했습니다.\n안전을 위해 로그아웃되었습니다."});
         }
+
         req.user = user;
         next();
     })
