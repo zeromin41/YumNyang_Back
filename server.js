@@ -142,7 +142,7 @@ app.post("/login", async (req, res) => {
 
         const token = jwt.sign({email}, jwtSecret, {expiresIn : '30m'});
 
-        await db.query('INSERT INTO TOKEN_USER(EMAIL, TOKEN) VALUES(?, ?) ON DUPLICATE KEY UPDATE TOKEN=?', [email, token. token]);
+        await db.query('INSERT INTO TOKEN_USER(EMAIL, TOKEN) VALUES(?, ?) ON DUPLICATE KEY UPDATE TOKEN=?', [email, token, token]);
 
         res.cookie('token', token, {
             httpOnly : true,
@@ -292,11 +292,18 @@ app.post("/AddRecipe", upload.array('images', 10), async (req, res) => {
         const urls = files.map(f =>
             `${req.protocol}://${req.get('host')}/uploads/${f.filename}`
         );
+
+        const mainImage = urls[0];
+        const descriptionImage = urls.slice(1);
         
-        const {userId, title, mainImage, description, targetPetType, foodCategory, cookingTimeLimit, level, caloriesPerServing, favoritesCount, carbs, protein, fat, calcium, phosphorus, moisture, fiber} = req.body;
-        await db.query(
-            "INSERT INTO RECIPES(USER_ID, TITLE, MAIN_IMAGE_URL, DESCRIPTION, TARGET_PET_TYPE, FOOD_CATEGORY, COOKING_TIME_LIMIT, LEVEL, CALORIES_PER_SERVING, FAVORITES_COUNT, NUTRITIONAL_INFO_CARBS_G, NUTRITIONAL_INFO_PROTEIN_G, NUTRITIONAL_INFO_FAT_G, NUTRITIONAL_INFO_CALCIUM_G, NUTRITIONAL_INFO_PHOSPHORUS_G, NUTRITIONAL_INFO_MOISTURE_PERCENT, NUTRITIONAL_INFO_FIBER_G) VALUE(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-            , []);
+        const {userId, title, description, targetPetType, foodCategory, cookingTimeLimit, level, caloriesPerServing, favoritesCount, carbs, protein, fat, calcium, phosphorus, moisture, fiber} = req.body;
+        const [result] = await db.execute(
+            "INSERT INTO RECIPES(USER_ID, TITLE, MAIN_IMAGE_URL, TARGET_PET_TYPE, FOOD_CATEGORY, COOKING_TIME_LIMIT, LEVEL, CALORIES_PER_SERVING, FAVORITES_COUNT, NUTRITIONAL_INFO_CARBS_G, NUTRITIONAL_INFO_PROTEIN_G, NUTRITIONAL_INFO_FAT_G, NUTRITIONAL_INFO_CALCIUM_G, NUTRITIONAL_INFO_PHOSPHORUS_G, NUTRITIONAL_INFO_MOISTURE_PERCENT, NUTRITIONAL_INFO_FIBER_G) VALUE(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            , [userId, title, mainImage, targetPetType, foodCategory, cookingTimeLimit, level, caloriesPerServing, favoritesCount, carbs, protein, fat, calcium, phosphorus, moisture, fiber]
+        );
+
+        const values = descriptionImage.map((url, index) => [result.RECIPE_ID, index, description[index], url]);
+        await db.query('INSERT INTO DESCRIPTION(RECIPE_ID, FLOW, DESCRIPTION, IMAGE_URL) VALUES ?', [values]);
 
         console.log("레시피 추가 완료");
         return res.status(200).json({message : "레시피 추가가 완료되었습니다."});
@@ -306,14 +313,64 @@ app.post("/AddRecipe", upload.array('images', 10), async (req, res) => {
     }
 });
 
-app.post("updateRecipe", upload.array("newImages", 10), async (req, res) => {
+// 레시피 수정
+app.post("/updateRecipe", upload.array("newImages", 10), async (req, res) => {
+    try {
+        const recipeId = req.body.recipeId;
+        const keepUrls = JSON.parse(req.body.keepUrls || '[]');
+        const {userId, title, description, targetPetType, foodCategory, cookingTimeLimit, level, caloriesPerServing, favoritesCount, carbs, protein, fat, calcium, phosphorus, moisture, fiber, mainChange, descriptionChange} = req.body;
 
+        const [existing] = await db.query("SELECT ID, FLOW, IMAGE_URL FROM DESCRIPTION WHERE RECIPE_ID=?", [recipeId]);
+
+        const toDelete = existing.filter(img => !keepUrls.includes(img.url));
+
+        for(let img of toDelete){
+            const filePath = path.join(__dirname, img.url);
+
+            fs.unlink(filePath, err => {
+                if(err) console.error("delete file error", err);
+            });
+        }
+
+        if(toDelete.length > 0){
+            const ids = toDelete.map(i => i.id);
+
+            await db.query("DELETE FROM DESCRIPTION WHERE ID IN (?)", [ids]);
+        }
+
+        const newFiles = req.files;
+        const newUrls = newFiles.map(f => `${req.protocol}://${req.get('host')}/uploads/${f.filename}`);
+
+        const mainImage = mainChange ? newUrls[0] : null;
+        const descriptionImage = newUrls.slice( mainChange ? 1 : 0);
+
+        if(descriptionImage.length > 0){
+            const values = descriptionImage.map((url) => [recipeId, descriptionChange[index], description[index], url]);
+
+            await db.query('INSERT INTO DESCRIPTION(RECIPE_ID, FLOW, DESCRIPTION, IMAGE_URL) VALUES ?', [values]);
+        }
+
+        const update = mainChange ? [userId, title, mainImage, targetPetType, foodCategory, cookingTimeLimit, level, caloriesPerServing, favoritesCount, carbs, protein, fat, calcium, phosphorus, moisture, fiber, recipeId]
+                                : [userId, title, targetPetType, foodCategory, cookingTimeLimit, level, caloriesPerServing, favoritesCount, carbs, protein, fat, calcium, phosphorus, moisture, fiber, recipeId]
+
+        await db.query(
+            `UPDATE RECIPES SET USER_ID=?, TITLE=?, ${ mainChange ? "MAIN_IMAGE_URL=?" : ""}, TARGET_PET_TYPE=?, FOOD_CATEGORY=?, COOKING_TIME_LIMIT=?, LEVEL=?, CALORIES_PER_SERVING=?, FAVORITES_COUNT=?, NUTRITIONAL_INFO_CARBS_G=?, NUTRITIONAL_INFO_PROTEIN_G=?, NUTRITIONAL_INFO_FAT_G=?, NUTRITIONAL_INFO_CALCIUM_G=?, NUTRITIONAL_INFO_PHOSPHORUS_G=?, NUTRITIONAL_INFO_MOISTURE_PERCENT=?, NUTRITIONAL_INFO_FIBER_G=? WHERE ID=?`
+            , update
+        );
+
+        console.log(`아이디 ${recipeId}가 변경되었습니다.`);
+        return res.status(200).json({message : "레시피가 수정되었습니다."});
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({error : "레시피를 수정하는데 실패했습니다."});
+    }
 });
 
+// 레시피 삭제
 app.get("/removeRecipe/:id", async (req, res) => {
     try {
         const { id } = req.params;
-        const [images] = await db.query("", [id]);
+        const [images] = await db.query("SELECT ID, IMAGE_URL FROM DESCRIPTION WHERE RECIPE_ID=?", [id]);
 
         for(let img of images){
             const relativePath = img.url.split("/uploads/")[1];
@@ -325,13 +382,13 @@ app.get("/removeRecipe/:id", async (req, res) => {
         if(images.length > 0){
             const imageIds = images.map(i => i.id);
 
-            await db.query("DELETE FROM ");
+            await db.query("DELETE FROM DESCRIPTION WHERE ID IN (?)", [imageIds]);
         }
 
         await db.query("DELETE FROM RECIPES WHERE ID=?", [id]);
 
+        console.log(`아이디 ${id} 레시피 삭제 완료`);
         return res.status(200).json({message : "레시피가 삭제되었습니다."});
-
     } catch (error) {
         console.error(error);
         return res.status(500).json({error : "레시피 삭제에 실패했습니다."});
