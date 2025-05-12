@@ -84,12 +84,12 @@ app.post("/signUp", async (req, res) => {
 
 // 회원 탈퇴
 app.post("/withdraw", async (req, res) => {
-    const {email, password} = req.body;
+    const {id, email, password} = req.body;
 
     try {
         const [rows] = await db.query(
-            'SELECT PASSWORD FROM USERS WHERE EMAIL=?',
-            [email]
+            'SELECT PASSWORD FROM USERS WHERE ID=? AND EMAIL=?',
+            [id,email]
         );
 
         if (rows.length === 0) {
@@ -160,7 +160,7 @@ app.post("/login", async (req, res) => {
         const nickname = rows[0].NICKNAME;
 
         console.log(`${nickname}님이 로그인했습니다.`);
-        return res.status(200).json({ message: `${nickname}님 환영합니다.`, id : id });
+        return res.status(200).json({ message: `${nickname}님 환영합니다.`, number : id });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ error: "로그인 중 오류가 발생했습니다." });
