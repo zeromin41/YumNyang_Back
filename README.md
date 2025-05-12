@@ -18,12 +18,12 @@
 - **Request Body**:
   ```json
   {
-    "email": "user@example.com",
-    "nickname": "nick",
-    "password": "plain_password",
-    "name": "뽀삐",
-    "type": "고양이",
-    "age": 3
+    "email": "user@example.com", // 필수
+    "nickname": "nick", // 필수
+    "password": "plain_password", // 필수
+    "name": "뽀삐", // 선택사항 단, 반려동물 기입 시 필수
+    "type": "고양이", // 선택사항 단, 반려동물 기입 시 필수
+    "age": 3 // 선택사항 / 반려동물 기입 시에도 선택사항
   }
   ```
 - **Response**:
@@ -35,8 +35,8 @@
 - **Request Body**:
   ```json
   {
-    "email": "user@example.com",
-    "password": "plain_password"
+    "email": "user@example.com", //필수
+    "password": "plain_password" //필수
   }
   ```
 - **Response**:
@@ -49,8 +49,8 @@
 - **Request Body**:
   ```json
   {
-    "email": "user@example.com",
-    "password": "plain_password"
+    "email": "user@example.com", // 필수
+    "password": "plain_password" // 필수
   }
   ```
 - **Response**:
@@ -66,8 +66,8 @@
   - **200 OK**:
     ```json
     {
-      "authenticated": true,
-      "user": { "email": "user@example.com" }
+      "authenticated": true, // 필수
+      "user": { "email": "user@example.com" } // 필수
     }
     ```
   - **401**: `{ "message": "유효하지 않은 토큰입니다." }`
@@ -89,10 +89,10 @@
 - **Request Body**:
   ```json
   {
-    "userId": 1,
-    "name": "뽀삐",
-    "type": "dog",
-    "age": 3
+    "userId": 1, // 필수
+    "name": "뽀삐", //필수
+    "type": "dog", //필수
+    "age": 3 // 선택
   }
   ```
 - **Response**:
@@ -104,11 +104,11 @@
 - **Request Body**:
   ```json
   {
-    "id": 10,
-    "userId": 1,
-    "name": "뽀삐",
-    "type": "dog",
-    "age": 4
+    "id": 10, // 필수
+    "userId": 1, // 필수
+    "name": "뽀삐", //필수
+    "type": "dog", //필수
+    "age": 4 // 필수
   }
   ```
 - **Response**:
@@ -144,7 +144,7 @@
 
 - **Request Body**:
   ```json
-  { "upperListSel": "402003" }
+  { "upperListSel": "402003" } // 필수
   ```
 - **Response**:
   - **200 OK**: `{ "test": [ /* 원료 배열 */ ] }`
@@ -158,8 +158,8 @@
 
 - **Content-Type**: `multipart/form-data`
 - **Form Data**:
-  - `images` (파일[], 최대 10장)
-  - `userId`, `title`, `description[]`, `targetPetType`, `foodCategory`, `cookingTimeLimit`, `level`, `caloriesPerServing`, `favoritesCount`, `carbs`, `protein`, `fat`, `calcium`, `phosphorus`, `moisture`, `fiber`
+  - `images` (파일[], 최대 10장) // 선택사항
+  - `userId`, `title`, `description[]`, `targetPetType`, `foodCategory`, `cookingTimeLimit`, `level`, `caloriesPerServing`, `favoritesCount`, `carbs`, `protein`, `fat`, `calcium`, `phosphorus`, `moisture`, `fiber` // 필수
 - **Image URL**: `https://seungwoo.i234.me/uploads/{filename}`
 - **Response**:
   - **200 OK**: `{ "message": "레시피 추가가 완료되었습니다." }`
@@ -169,8 +169,8 @@
 
 - **Content-Type**: `multipart/form-data`
 - **Form Data**:
-  - `recipeId`, `keepUrls[]`, `newImages[]`
-  - 기타 필드: `userId`, `title`, `descriptionChange[]`, `description[]`, `targetPetType`, `foodCategory`, `cookingTimeLimit`, `level`, `caloriesPerServing`, `favoritesCount`, `carbs`, `protein`, `fat`, `calcium`, `phosphorus`, `moisture`, `fiber`, `mainChange`
+  - `recipeId`, `keepUrls[]`, `newImages[]` // 선택
+  - 기타 필드: `userId`, `title`, `descriptionChange[]`, `description[]`, `targetPetType`, `foodCategory`, `cookingTimeLimit`, `level`, `caloriesPerServing`, `favoritesCount`, `carbs`, `protein`, `fat`, `calcium`, `phosphorus`, `moisture`, `fiber`, `mainChange` // 필수
 - **Image URL**: `https://seungwoo.i234.me/uploads/{filename}`
 - **Response**:
   - **200 OK**: `{ "message": "레시피가 수정되었습니다." }`
@@ -196,9 +196,9 @@
 - **Request Body**:
   ```json
   {
-    "pet": "강아지",
-    "food": "수산물",
-    "ingredient": "연어"
+    "pet": "강아지", // 선택
+    "food": "수산물", // 선택
+    "ingredient": "연어" // 선택
   }
   ```
 - **Response**:
@@ -222,10 +222,10 @@
 - **Request Body**:
   ```json
   {
-    "recipeId": 1,
-    "userId": 2,
-    "ratingScore": 4,
-    "commentText": "맛있어요!"
+    "recipeId": 1, //필수
+    "userId": 2, //필수
+    "ratingScore": 4, //필수
+    "commentText": "맛있어요!" //필수
   }
   ```
 - **Response**:
@@ -253,10 +253,10 @@
 - **Request Body**:
   ```json
   {
-    "id": 5,
-    "type": "update",
-    "ratingScore": 3,
-    "commentText": "괜찮아요"
+    "id": 5, //필수
+    "type": "update", //필수
+    "ratingScore": 3, //필수
+    "commentText": "괜찮아요" // 필수
   }
   ```
 - **Response**:
@@ -272,8 +272,8 @@
 - **Request Body**:
   ```json
   {
-    "userId": 2,
-    "recipeId": 1
+    "userId": 2, //필수
+    "recipeId": 1 //필수
   }
   ```
 - **Response**:
@@ -303,8 +303,8 @@
 - **Request Body**:
   ```json
   {
-    "userId": 2,
-    "recipeId": 1
+    "userId": 2, //필수
+    "recipeId": 1 //필수
   }
   ```
 - **Response**:

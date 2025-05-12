@@ -232,6 +232,8 @@ app.post("/addPetInfo", async (req, res) => {
     try {
         const { userId, name, type, age } = req.body;
 
+        if(!age) age = null;
+
         await db.query("INSERT INTO PETS(USER_ID, NAME, TYPE, AGE) VALUES(?, ?, ?, ?)", [userId, name, type, age]);
 
         console.log(`아이디 ${id}님의 펫 정보를 입력하였습니다.`);
