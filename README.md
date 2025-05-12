@@ -20,7 +20,10 @@
   {
     "email": "user@example.com",
     "nickname": "nick",
-    "password": "plain_password"
+    "password": "plain_password",
+    "name": "뽀삐",
+    "type": "고양이",
+    "age": 3
   }
   ```
 - **Response**:

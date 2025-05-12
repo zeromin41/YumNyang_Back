@@ -58,7 +58,7 @@ const upload = multer({ storage });
 
  // 회원가입
 app.post("/signUp", async (req, res) => {
-    const { email, nickname, password } = req.body;
+    const { email, nickname, password, name, type, age } = req.body;
     try {
         const hashPassword = await argon2.hash(password, {
             type : argon2.ArgonType.argon2id,
@@ -67,7 +67,12 @@ app.post("/signUp", async (req, res) => {
             parallelism : process.env.PARALLELISM
         });
 
-        await db.query('INSERT INTO USERS(EMAIL, PASSWORD, NICKNAME) VALUES(?, ?, ?)', [email, hashPassword, nickname]);
+        const [result] = await db.execute('INSERT INTO USERS(EMAIL, PASSWORD, NICKNAME) VALUES(?, ?, ?)', [email, hashPassword, nickname]);
+
+        if(!name && !type){
+            if(!age) age = null;
+            await db.query("INSERT INTO PETS(USER_ID, NAME, TYPE, AGE) VALUES(?, ?, ?, ?)", [result.ID, name, type, age]);
+        }
 
         console.log(`${email}  회원가입 성공`);
         return res.status(200).json({message : "회원가입이 완료되었습니다."});
