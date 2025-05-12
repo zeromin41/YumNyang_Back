@@ -284,7 +284,7 @@ app.post("/getIngredient", async (req, res) => {
 });
 
 // 레시피 추가
-// 아직 미완성 5/12 완성될 예장
+// 아직 미완성 5/12 완성될 예정
 app.post("/AddRecipe", upload.array('images', 10), async (req, res) => {
     try {
         const files = req.files;
@@ -292,7 +292,6 @@ app.post("/AddRecipe", upload.array('images', 10), async (req, res) => {
         const urls = files.map(f =>
             `${req.protocol}://${req.get('host')}/uploads/${f.filename}`
         );
-
         
         const {userId, title, mainImage, description, targetPetType, foodCategory, cookingTimeLimit, level, caloriesPerServing, favoritesCount, carbs, protein, fat, calcium, phosphorus, moisture, fiber} = req.body;
         await db.query(
