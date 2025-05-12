@@ -159,7 +159,7 @@ app.post("/login", async (req, res) => {
     }
 });
 
-// 회원 관리
+// 회원 토큰 관리
 app.get('/checkToken', authenticateToken, (req, res) => {
     try {
         const payload = { email : req.user.email};
@@ -201,6 +201,87 @@ app.post('/logout', authenticateToken, async (req, res) => {
         return res.status(500).json({error : "로그아웃에 실패했습니다."})
     }
 });
+
+// 유저 닉네임 찾기
+app.get("/getUserNickname/:id", async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const [rows] = await db.query("SELECT NICKNAME FROM USERS WHERE ID=?", [id]);
+
+        if(rows.length === 0) return res.status(404).json({message : "유저가 존재하지않습니다."});
+
+        return res.status(200).json({nickname : rows[0]});
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({error : "유저 정보를 가져오는데 실패했습니다."});
+    }
+});
+
+/**
+ * 반려동물 정보
+ */
+
+//반려동물 정보 추가
+app.post("/addPetInfo", async (req, res) => {
+    try {
+        const { userId, name, type, age } = req.body;
+
+        await db.query("INSERT INTO PETS(USER_ID, NAME, TYPE, AGE) VALUES(?, ?, ?, ?)", [userId, name, type, age]);
+
+        console.log(`아이디 ${id}님의 펫 정보를 입력하였습니다.`);
+        return res.status(200).json({message : "펫 정보가 입력되었습니다."});
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({error : "반려동물 정보를 입력하는데 실패했습니다."});
+    }
+});
+
+//반려동물 정보 업데이트
+app.post("/UpdatePetInfo", async (req, res) => {
+    try {
+        const { id, userId, name, type, age } = req.body;
+
+        await db.query("UPDATE PETS SET NAME=?, TYPE=?, AGE=? WHERE ID=?", [name, type, age, id]);
+
+        console.log(`아이디 ${userId}님의 펫 정보를 변경하였습니다.`);
+        return res.status(200).json({message : "펫 정보가 변경되었습니다."});
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({error : "반려동물 정보를 변경하는데 실패했습니다."});
+    }
+});
+
+// 반려동물 정보 가져오기
+app.get("/getPetInfo/:userId", async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        const [rows] = await db.query("SELECT * FROM PETS USER_ID=?", [userId]);
+
+        if(rows.length === 0) return res.status(404).json({message : "등록된 펫이 없습니다."});
+        console.log(`${userId}님의 등록된 펫을 가져옵니다.`);
+        return res.status(200).json({pets : rows});
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({error : "반려동물 정보를 가져오는데 실패했습니다."});
+    }
+});
+
+// 반려동물 정보 삭제하기
+app.post("/removePetInfo/:id", async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        await db.query("DELETE FROM PETS WHERE ID=?", [id]);
+
+        console.log(`${id}를 삭제했습니다.`);
+        return res.status(200).json({message : "반려동물 정보를 삭제했습니다."});
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({error : "반려동물 정보를 삭제하는데 실패했습니다."});
+    }
+})
 
 /**
  * 레시피
@@ -284,7 +365,6 @@ app.post("/getIngredient", async (req, res) => {
 });
 
 // 레시피 추가
-// 아직 미완성 5/12 완성될 예정
 app.post("/AddRecipe", upload.array('images', 10), async (req, res) => {
     try {
         const files = req.files;
@@ -421,7 +501,7 @@ app.post("/searchRecipe", async (req, res) => {
     try {
         const { pet, food, ingredient } = req.body;
 
-        const [recipeIngredient] = ingredient ? await db.query("SELECT * FROM RECIPE_INGREDIENTS WHERE INGREDIENT_NAME=?", ingredient) : null;
+        const [recipeIngredient] = ingredient ? await db.query("SELECT ID, USER_ID, TITLE, MAIN_IMAGE_URL, VIEW_COUNT FROM RECIPE_INGREDIENTS WHERE INGREDIENT_NAME=?", ingredient) : null;
         const check = [];
         if(pet) check.push(pet);
         if(food) check.push(food);
@@ -439,6 +519,22 @@ app.post("/searchRecipe", async (req, res) => {
     } catch (error) {
         console.error(error);
         return res.status(500).json({error : "레시피를 검색하는데 실패했습니다."});
+    }
+});
+
+app.get("/getMyRecipe/:userId", async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        const [rows] = await db.query("SELECT ID, MAIN_IMAGE_URL, TITLE FROM RECIPES WHERE USER_ID=?", [userId]);
+
+        if(rows.length === 0) return res.status(404).json({message : "레시피가 없습니다."});
+
+        console.log(`${userId}님의 나의 레시피를 불러옵니다.`);
+        return res.status(200).json({recipe : rows});
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({error : "나의 레시피를 찾는데 실패했습니다."});
     }
 });
 
@@ -482,9 +578,9 @@ app.get("/getReview/:recipeId", async (req, res) => {
 app.post("/upDateReview", async (req, res) => {
     const { id, type, ratingScore, commentText } = req.body;
     try {
-        const [rows] = type === "update" ? await db.query("UPDATE REVIEWS SET RATING_SCORE=? AND COMMENT_TEXT=? FROM WHERE ID=?", [ratingScore, commentText, id])
-                                         : type === "delete" ? await db.query("DELETE FROM REVIEWS WHERE ID=?", [id])
-                                         : null;
+        type === "update" ? await db.query("UPDATE REVIEWS SET RATING_SCORE=? AND COMMENT_TEXT=? FROM WHERE ID=?", [ratingScore, commentText, id])
+                          : type === "delete" ? await db.query("DELETE FROM REVIEWS WHERE ID=?", [id])
+                          : null;
 
         console.log(`리뷰 아이디 ${id}를 ${type === "update" ? "업데이트" : type === "delete" ? "삭제" : "비정상 접근을"} 했습니다.`);
         return res.status(200).json({message : type === "update" ? "업데이트 성공" : type === "delete" ? "삭제 성공" : "비정상 접근입니다."});
@@ -493,6 +589,22 @@ app.post("/upDateReview", async (req, res) => {
         return res.status(500).json({error : `${type === "update" ? "리뷰 업데이트를 실패했습니다." : type === "delete" ? "리뷰 삭제를 실패했습니다." : "비정상 접근입니다."}`});
     }
 });
+
+app.get("/getMyReview/:userId", async (req, res) => {
+    const { userId } = req.params;
+
+    try {
+        const [rows] = await db.query("SELECT * FROM REVIEWS WHERE USER_ID=?", [userId]);
+
+        if(rows.length === 0) return res.status(404).json({message : "리뷰가 없습니다."});
+
+        console.log(`${userId}님이 작성하신 리뷰를 가져옵니다.`);
+        return res.status(200).json({reviews : rows});
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({error : "나의 리뷰를 가져오는데 실패했습니다."});
+    }
+})
 
 /**
  * 즐겨찾기
@@ -578,7 +690,7 @@ app.get("/getRecentlyView/:userId", async (req, res) => {
 // 인기있는 5개의 레시피 보여주기
 app.get("/getPopularity", async (req, res) => {
     try {
-        const [rows] = await db.query("SELECT * FROM RECIPES ORDER BY VIEW_COUNT DESC LIMIT 5");
+        const [rows] = await db.query("SELECT ID, USER_ID, TITLE, MAIN_IMAGE_URL, VIEW_COUNT FROM RECIPES ORDER BY VIEW_COUNT DESC LIMIT 5");
 
         console.log("인기있는 레시피 5개를 추출합니다.");
         return res.status(200).json({popularity : rows});
