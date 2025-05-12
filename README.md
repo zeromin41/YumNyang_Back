@@ -35,6 +35,7 @@
 - **Request Body**:
   ```json
   {
+    "id": "1", // 필수
     "email": "user@example.com", //필수
     "password": "plain_password" //필수
   }
@@ -54,7 +55,7 @@
   }
   ```
 - **Response**:
-  - **200 OK**: `{ "message": "user님 환영합니다.", "id": "1" }`
+  - **200 OK**: `{ "message": "user님 환영합니다.", "number": "1" }`
   - **401**: `{ "message": "패스워드 5회 이상 실패했습니다." }`
   - **404**: `{ "message": "아이디 또는 패스워드가 올바르지않습니다." }`
   - **500**: `{ "error": "로그인 중 오류가 발생했습니다." }`
