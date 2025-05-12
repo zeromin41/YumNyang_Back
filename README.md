@@ -4,7 +4,7 @@
 
 ## API 명세서
 
-- **Base URL**: `https://seungwoo.i234.me`
+- **Base URL**: `https://seungwoo.i234.me:3333`
 - **Content-Type**: `application/json`
 - **쿠키 사용**: 인증 토큰은 `token` 쿠키에 `httpOnly` 설정으로 저장
 
