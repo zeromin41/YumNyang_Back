@@ -290,7 +290,7 @@ app.post("/AddRecipe", upload.array('images', 10), async (req, res) => {
         const files = req.files;
 
         const urls = files.map(f =>
-            `${req.protocol}://${req.get('host')}/uploads/${f.filename}`
+            `${req.protocol}://${req.hostname}/uploads/${f.filename}`
         );
 
         const mainImage = urls[0];
@@ -339,7 +339,7 @@ app.post("/updateRecipe", upload.array("newImages", 10), async (req, res) => {
         }
 
         const newFiles = req.files;
-        const newUrls = newFiles.map(f => `${req.protocol}://${req.get('host')}/uploads/${f.filename}`);
+        const newUrls = newFiles.map(f => `${req.protocol}://${req.hostname}/uploads/${f.filename}`);
 
         const mainImage = mainChange ? newUrls[0] : null;
         const descriptionImage = newUrls.slice( mainChange ? 1 : 0);

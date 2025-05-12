@@ -413,7 +413,7 @@
 <summary>정적 파일 업로드</summary>
 
 - **업로드 경로**: `/uploads/{filename}`
-- **서버 시작**: HTTPS 3333 포트
+- **서버 시작**: HTTPS (`https://seungwoo.i234.me/uploads/{filename}`)
 
 > **Note:** 각 엔드포인트의 응답 예시는 성공 케이스를 중심으로 기재하였으며, 모든 에러 케이스는 상태 코드에 맞는 JSON 형태의 `error` 또는 `message` 필드를 반환합니다.
 
