@@ -156,8 +156,11 @@ app.post("/login", async (req, res) => {
             maxAge : 30 * 60 * 1000
         });
 
-        console.log(`${email}님이 로그인했습니다.`);
-        return res.status(200).json({ message: `${email}님 환영합니다.` });
+        const id = rows[0].ID;
+        const nickname = rows[0].NICKNAME;
+
+        console.log(`${nickname}님이 로그인했습니다.`);
+        return res.status(200).json({ message: `${nickname}님 환영합니다.`, id : id });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ error: "로그인 중 오류가 발생했습니다." });
