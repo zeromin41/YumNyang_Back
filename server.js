@@ -570,12 +570,15 @@ app.get("/getRecipe/:id", async (req, res) => {
     try {
         const { id } = req.params;
 
+
         const [recipe] = await db.query("SELECT * FROM RECIPES WHERE ID=?", [id]);
 
         if(recipe.length === 0) return res.status(404).json({message : "레시피가 존재하지않습니다."});
 
+
         recipe[0]["VIEW_COUNT"] += 1;
         await db.query("UPDATE RECIPES SET VIEW_COUNT=? WHERE ID=?", [recipe[0]["VIEW_COUNT"], id]);
+
 
         const[description] = await db.query("SELECT * FROM DESCRIPTION WHERE ID=?",[id]);
 
@@ -586,6 +589,19 @@ app.get("/getRecipe/:id", async (req, res) => {
         return res.status(500).json({error : "레시피를 불러오는데 실패했습니다."});
     }
 });
+
+// 디테일 페이지에 사용할 레시피 가져오기 (Description 테이블)
+app.get("/getDetailRecipe/:id",async(req,res)=>{
+    try {
+        const{id} = req.params;
+        const[rows] = await db.query("SELECT * FROM DESCRIPTION WHERER ID=?",[id])
+        console.log(`getDetailRecipe 아이디 ${id} 레시피 불러오기`);
+        return res.status(200).json({recipe : rows});
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({error : "getDetailRecipe 오류 레시피를 불러오는데 실패했습니다."});
+    }
+})
 
 // 레시피 상세 찾기
 app.post("/searchRecipe", async (req, res) => {
