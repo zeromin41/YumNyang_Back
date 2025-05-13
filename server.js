@@ -210,6 +210,62 @@ app.post('/logout', authenticateToken, async (req, res) => {
     }
 });
 
+//비밀번호 확인
+app.post('/passwordCheck', async (req, res) => {
+    try {
+        const {id, email, password} = req.body;
+
+        const [rows] = await db.query(
+            'SELECT PASSWORD FROM USERS WHERE ID=? AND EMAIL=?',
+            [id,email]
+        );
+
+        if (rows.length === 0) {
+            return res.status(500).json({ message: "정상적인 접근이 아닙니다." });
+        }
+
+        const hash = rows[0].PASSWORD;
+
+        const valid = await argon2.verify(hash, password);
+
+        if(!valid) return res.status(404).json({ message: "패스워드가 올바르지않습니다." });
+
+        return res.status(200).json({message : "비밀번호가 확인되었습니다."});
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({error : "서버에 오류가 발생했습니다."});
+    }
+});
+
+// 내용 변경
+app.post('/changeUserInfo', async (req, res) => {
+    const { id, nickname, password } = req.body;
+    try {
+
+        const query = [];
+        if(nickname) query.push(nickname);
+        if(password){
+            const hashPassword = await argon2.hash(password, {
+                type : argon2.ArgonType.argon2id,
+                timeCost : process.env.TIME_COST,
+                memoryCost : 1 << process.env.MEMORY_COST,
+                parallelism : process.env.PARALLELISM
+            });
+
+            query.push(hashPassword);
+        }
+        query.push(id);
+
+        await db.query(`UPDATE USERS SET ${nickname ? "NICKNAME=?," : ""} ${password ? "PASSWORD=?" : ""} WHERE ID=?`, query);
+
+        console.log(`${id} 회원정보 변경 성공`);
+        return res.status(200).json({message : "회원정보 변경이 완료되었습니다."});
+    } catch (error) {
+        console.error(error)
+        return res.status(500).json({error : "회원 정보 변경에 실패했습니다."});
+    }
+});
+
 // 유저 닉네임 찾기
 app.get("/getUserNickname/:id", async (req, res) => {
     try {
@@ -379,12 +435,12 @@ app.post("/AddRecipe", upload.array('images', 10), async (req, res) => {
     try {
         const files = req.files;
 
-        const urls = files.map(f =>
+        const urls = files.length > 0 ? files.map(f =>
             `${req.protocol}://${req.hostname}/uploads/${f.filename}`
-        );
+        ) : null;
 
-        const mainImage = urls[0];
-        const descriptionImage = urls.slice(1);
+        const mainImage = urls ? urls[0] : null;
+        const descriptionImage = urls ? urls.slice(1) : null;
         
         const {userId, title, description, targetPetType, foodCategory, cookingTimeLimit, level, caloriesPerServing, favoritesCount, carbs, protein, fat, calcium, phosphorus, moisture, fiber} = req.body;
         const [result] = await db.execute(
@@ -392,8 +448,10 @@ app.post("/AddRecipe", upload.array('images', 10), async (req, res) => {
             , [userId, title, mainImage, targetPetType, foodCategory, cookingTimeLimit, level, caloriesPerServing, favoritesCount, carbs, protein, fat, calcium, phosphorus, moisture, fiber]
         );
 
-        const values = descriptionImage.map((url, index) => [result.RECIPE_ID, index, description[index], url]);
-        await db.query('INSERT INTO DESCRIPTION(RECIPE_ID, FLOW, DESCRIPTION, IMAGE_URL) VALUES ?', [values]);
+        if(descriptionImage !== null){
+            const values = descriptionImage.map((url, index) => [result.RECIPE_ID, index, description[index], url]);
+            await db.query('INSERT INTO DESCRIPTION(RECIPE_ID, FLOW, DESCRIPTION, IMAGE_URL) VALUES ?', [values]);
+        }
 
         console.log("레시피 추가 완료");
         return res.status(200).json({message : "레시피 추가가 완료되었습니다."});
@@ -429,12 +487,12 @@ app.post("/updateRecipe", upload.array("newImages", 10), async (req, res) => {
         }
 
         const newFiles = req.files;
-        const newUrls = newFiles.map(f => `${req.protocol}://${req.hostname}/uploads/${f.filename}`);
+        const newUrls = newFiles.length > 0 ? newFiles.map(f => `${req.protocol}://${req.hostname}/uploads/${f.filename}`) : null;
 
-        const mainImage = mainChange ? newUrls[0] : null;
-        const descriptionImage = newUrls.slice( mainChange ? 1 : 0);
+        const mainImage = mainChange && newUrls ? newUrls[0] : null;
+        const descriptionImage = newUrls ? newUrls.slice( mainChange ? 1 : 0) : null;
 
-        if(descriptionImage.length > 0){
+        if(descriptionImage && descriptionImage.length > 0){
             const values = descriptionImage.map((url) => [recipeId, descriptionChange[index], description[index], url]);
 
             await db.query('INSERT INTO DESCRIPTION(RECIPE_ID, FLOW, DESCRIPTION, IMAGE_URL) VALUES ?', [values]);
