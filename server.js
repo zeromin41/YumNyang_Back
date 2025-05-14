@@ -88,7 +88,7 @@ app.post("/signUp", async (req, res) => {
 });
 
 // 아이디 확인
-app.get("/checkId", async (req, res) => {
+app.post("/checkId", async (req, res) => {
     try {
         const { email } = req.body;
 

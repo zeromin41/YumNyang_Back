@@ -123,7 +123,7 @@
 </details>
 
 <details>
-<summary>GET /checkId</summary>
+<summary>POST /checkId</summary>
 
 - **설명**: 이메일(아이디) 중복 확인
 - **Request Body** (`application/json`):
@@ -192,9 +192,9 @@
 <details>
 <summary>GET /getUserNickname/:id</summary>
 
-- **설명**: 사용자 닉네임 조회
+- **설명**: 사용자 조회
 - **Response**:
-  - `200 OK` `{ "nickname": "userNickname" }`
+  - `200 OK` `{  "nickname": "userNickname" }`
   - `404 Not Found` `{ "message": "유저가 존재하지않습니다." }`
   - `500 Internal Server Error` `{ "error": "유저 정보를 가져오는데 실패했습니다." }`
   </details>
