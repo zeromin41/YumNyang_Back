@@ -60,6 +60,9 @@ const upload = multer({ storage });
 app.post("/signUp", async (req, res) => {
     const { email, nickname, password, name, type, age } = req.body;
     try {
+
+        if(effectiveness(email, nickname, password)) return res.status(404).json({message : "올바르지못한 형식입니다."});
+
         const hashPassword = await argon2.hash(password, {
             type : argon2.ArgonType.argon2id,
             timeCost : process.env.TIME_COST,
@@ -84,11 +87,31 @@ app.post("/signUp", async (req, res) => {
     }
 });
 
+// 아이디 확인
+app.get("/checkId", async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if(effectiveness(email, undefined, undefined)) return res.status(404).json({message : "올바르지못한 형식입니다."});
+
+        const [res] = await db.query("SELECT * FROM USERS WHERE EMAIL=?", [email]);
+
+        if(rows.length > 0) return res.status(404).json({message : "존재하는 아이디입니다."});
+        
+        return res.status(200).json({message : "사용가능한 아이디입니다."});
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({error : "서버에 문제가 발생했습니다."});
+    }
+})
+
 // 회원 탈퇴
 app.post("/withdraw", async (req, res) => {
     const {id, email, password} = req.body;
 
     try {
+        if(effectiveness(email, undefined, password)) return res.status(404).json({message : "올바르지못한 형식입니다."});
+
         const [rows] = await db.query(
             'SELECT PASSWORD FROM USERS WHERE ID=? AND EMAIL=?',
             [id,email]
@@ -122,6 +145,8 @@ app.post("/login", async (req, res) => {
     const { email, password } = req.body;
     
     try {
+        if(effectiveness(email, undefined, password)) return res.status(404).json({message : "올바르지못한 형식입니다."});
+
         const [rows] = await db.query(
         'SELECT PASSWORD FROM USERS WHERE EMAIL = ?',
         [email]
@@ -174,6 +199,8 @@ app.get('/checkToken', authenticateToken, (req, res) => {
     try {
         const payload = { email : req.user.email};
 
+        if(effectiveness(payload.email, undefined, undefined)) return res.status(404).json({message : "올바르지못한 형식입니다."});
+
         const newToken = jwt.sign(payload, jwtSecret, {expiresIn : '30m'});
 
         res.cookie('token', newToken, {
@@ -200,6 +227,8 @@ app.post('/logout', authenticateToken, async (req, res) => {
     try {
         const email = req.user.email;
 
+        if(effectiveness(email, undefined, undefined)) return res.status(404).json({message : "올바르지못한 형식입니다."});
+
         await db.query("DELETE FROM TOKEN_USER WHERE EMAIL=?", [email]);
 
         res.clearCookie('token');
@@ -216,6 +245,8 @@ app.post('/logout', authenticateToken, async (req, res) => {
 app.post('/passwordCheck', async (req, res) => {
     try {
         const {id, email, password} = req.body;
+        
+        if(effectiveness(email, undefined, password)) return res.status(404).json({message : "올바르지못한 형식입니다."});
 
         const [rows] = await db.query(
             'SELECT PASSWORD FROM USERS WHERE ID=? AND EMAIL=?',
@@ -456,8 +487,8 @@ app.post("/AddRecipe", upload.array('images', 10), async (req, res) => {
             await db.query('INSERT INTO DESCRIPTION(RECIPE_ID, FLOW, DESCRIPTION, IMAGE_URL) VALUES (?, ?, ?, ?)', [result[0].ID, index, description[index], descriptionImage === null ? null : descriptionImage[index]]);
         }
 
-        if(ingredientsName && ingredientsAmount && ingredientsUnit && ingredientsName.length === ingredientsAmount.length === ingredientsUnit.length){
-            for(const index of ingredientsName){
+        if(ingredientsName && ingredientsAmount && ingredientsUnit && ingredientsName.length === ingredientsAmount.length && ingredientsUnit.length === ingredientsAmount.length){
+            for(const index in ingredientsName){
                 await db.query('INSERT INTO RECIPE_INGREDIENTS(RECIPE_ID, INGREDIENT_NAME, QUANTITY_AMOUNT, QUANTITY_UNIT) VALUES(?, ?, ?, ?)', [result[0].ID, ingredientsName[index], ingredientsAmount[index], ingredientsUnit[index]]);
             }
         }
@@ -523,8 +554,8 @@ app.post("/updateRecipe", upload.array("newImages", 10), async (req, res) => {
 
         await db.query('DELETE FROM RECIPE_INGREDIENTS WHERE RECIPE_ID=?', [recipeId]);
 
-        if(ingredientsName && ingredientsAmount && ingredientsUnit && ingredientsName.length === ingredientsAmount.length === ingredientsUnit.length ){
-            for(const index of ingredientsName){
+        if(ingredientsName && ingredientsAmount && ingredientsUnit && ingredientsName.length === ingredientsAmount.length && ingredientsUnit.length === ingredientsAmount.length){
+            for(const index in ingredientsName){
                 await db.query('INSERT INTO RECIPE_INGREDIENTS(RECIPE_ID, INGREDIENT_NAME, QUANTITY_AMOUNT, QUANTITY_UNIT) VALUES(?, ?, ?, ?)', [recipeId, ingredientsName[index], ingredientsAmount[index], ingredientsUnit[index]]);
             }
         }
@@ -577,7 +608,7 @@ app.get("/getRecipe/:id", async (req, res) => {
         recipe[0]["VIEW_COUNT"] += 1;
         await db.query("UPDATE RECIPES SET VIEW_COUNT=? WHERE ID=?", [recipe[0]["VIEW_COUNT"], id]);
 
-        const[description] = await db.query("SELECT * FROM DESCRIPTION WHERE ID=?",[id]);
+        const[description] = await db.query("SELECT * FROM DESCRIPTION WHERE RECIPE_ID=?",[id]);
 
         console.log(`아이디 ${id} 레시피 불러오기`);
         return res.status(200).json({recipe : recipe[0], description : description});
@@ -720,7 +751,7 @@ app.get("/getFavorites/:userId", async (req, res) => {
     try {
         const { userId } = req.params;
 
-        const [rows] = await db.query("SELECT * FROM FAVORITES WHERE USERID=?", [userId]);
+        const [rows] = await db.query("SELECT * FROM FAVORITES WHERE USER_ID=?", [userId]);
 
         console.log(`${userId}님의 즐겨찾기를 찾았습니다.`);
         return res.status(200).json({favorites : rows});
@@ -811,4 +842,35 @@ function authenticateToken(req, res, next) {
         req.user = user;
         next();
     })
+}
+
+function effectiveness(email, nickname, password){
+    // 1. 아이디: 영문 소문자 + 숫자 조합, 5~20자, 특수문자 제외
+    const idRegex = /^(?=.*[a-z])(?=.*\d)[a-z\d]{5,20}$/;
+
+    // 2. 닉네임: 한글/영문/숫자 허용, 2~10자, 특수문자 제외
+    const nicknameRegex = /^[가-힣A-Za-z0-9]{2,10}$/;
+
+    // 3. 비밀번호: 영문 대/소문자 + 숫자 + 특수문자 포함, 8~20자
+    const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,20}$/;
+
+    if(email){
+        if(!idRegex.test(email)){
+            return true;
+        }
+    }
+
+    if(nickname){
+        if(!nicknameRegex.test(nickname)){
+            return true;
+        }
+    }
+
+    if(password){
+        if(!passwordRegex.test(password)){
+            return true;
+        }
+    }
+
+    return false;
 }
