@@ -142,7 +142,7 @@
 - **설명**: 닉네임 중복 확인
 - **Request Body** (`application/json`):
   ```json
-  { "email": "user@example.com" }
+  { "nickname": "nickname" }
   ```
 - **Response**:
   - `200 OK` `{ "message": "사용가능한 닉네임입니다." }`
@@ -348,7 +348,7 @@
 
 - **설명**: 레시피 조회 (조회수 증가)
 - **Response**:
-  - `200 OK` `{ "recipe": { /* RECIPES */ }, "description": [ /* DESCRIPTION */ ] }`
+  - `200 OK` `{ "recipe": { /* RECIPES */ }, "description": [ /* DESCRIPTION */ ],  "ingredient": [ /* INGREDIENT */ ]}`
   - `404 Not Found` `{ "message": "레시피가 존재하지않습니다." }`
   - `500 Internal Server Error`
 

@@ -94,7 +94,7 @@ app.post("/checkId", async (req, res) => {
 
         if(effectiveness(email, undefined, undefined)) return res.status(404).json({message : "올바르지못한 형식입니다."});
 
-        const [res] = await db.query("SELECT * FROM USERS WHERE EMAIL=?", [email]);
+        const [rows] = await db.query("SELECT * FROM USERS WHERE EMAIL=?", [email]);
 
         if(rows.length > 0) return res.status(404).json({message : "존재하는 아이디입니다."});
         
@@ -112,7 +112,7 @@ app.post("/checkNickname", async (req, res) => {
 
         if(effectiveness(undefined, nickname, undefined)) return res.status(404).json({message : "올바르지못한 형식입니다."});
 
-        const [res] = await db.query("SELECT * FROM USERS WHERE NICKNAME=?", [nickname]);
+        const [rows] = await db.query("SELECT * FROM USERS WHERE NICKNAME=?", [nickname]);
 
         if(rows.length > 0) return res.status(404).json({message : "존재하는 닉네임입니다."});
         
@@ -626,10 +626,12 @@ app.get("/getRecipe/:id", async (req, res) => {
         recipe[0]["VIEW_COUNT"] += 1;
         await db.query("UPDATE RECIPES SET VIEW_COUNT=? WHERE ID=?", [recipe[0]["VIEW_COUNT"], id]);
 
-        const[description] = await db.query("SELECT * FROM DESCRIPTION WHERE RECIPE_ID=?",[id]);
+        const [description] = await db.query("SELECT * FROM DESCRIPTION WHERE RECIPE_ID=?",[id]);
+
+        const [ingredient] = await db.query("SELECT * FROM RECIPE_INGREDIENTS WHERE RECIPE_ID=?", [id]);
 
         console.log(`아이디 ${id} 레시피 불러오기`);
-        return res.status(200).json({recipe : recipe[0], description : description});
+        return res.status(200).json({recipe : recipe[0], description : description, ingredient : ingredient});
     } catch (error) {
         console.error(error);
         return res.status(500).json({error : "레시피를 불러오는데 실패했습니다."});
