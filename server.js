@@ -103,7 +103,25 @@ app.post("/checkId", async (req, res) => {
         console.error(error);
         return res.status(500).json({error : "서버에 문제가 발생했습니다."});
     }
-})
+});
+
+// 닉네임 확인
+app.post("/checkNickname", async (req, res) => {
+    try {
+        const { nickname } = req.body;
+
+        if(effectiveness(undefined, nickname, undefined)) return res.status(404).json({message : "올바르지못한 형식입니다."});
+
+        const [res] = await db.query("SELECT * FROM USERS WHERE NICKNAME=?", [nickname]);
+
+        if(rows.length > 0) return res.status(404).json({message : "존재하는 닉네임입니다."});
+        
+        return res.status(200).json({message : "사용가능한 닉네임입니다."});
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({error : "서버에 문제가 발생했습니다."});
+    }
+});
 
 // 회원 탈퇴
 app.post("/withdraw", async (req, res) => {

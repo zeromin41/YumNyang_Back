@@ -137,6 +137,20 @@
   </details>
 
 <details>
+<summary>POST /checkNickname</summary>
+
+- **설명**: 닉네임 중복 확인
+- **Request Body** (`application/json`):
+  ```json
+  { "email": "user@example.com" }
+  ```
+- **Response**:
+  - `200 OK` `{ "message": "사용가능한 닉네임입니다." }`
+  - `404 Not Found` `{ "message": "존재하는 닉네임입니다." }`
+  - `500 Internal Server Error` `{ "error": "서버에 문제가 발생했습니다." }`
+  </details>
+
+<details>
 <summary>POST /withdraw</summary>
 
 - **설명**: 회원 탈퇴
