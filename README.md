@@ -122,6 +122,83 @@
 
 </details>
 
+<details>
+<summary>GET /checkId</summary>
+
+- **설명**: 이메일(아이디) 중복 확인
+- **Request Body** (`application/json`):
+  ```json
+  { "email": "user@example.com" }
+  ```
+- **Response**:
+  - `200 OK` `{ "message": "사용가능한 아이디입니다." }`
+  - `404 Not Found` `{ "message": "존재하는 아이디입니다." }`
+  - `500 Internal Server Error` `{ "error": "서버에 문제가 발생했습니다." }`
+  </details>
+
+<details>
+<summary>POST /withdraw</summary>
+
+- **설명**: 회원 탈퇴
+- **Request Body** (`application/json`):
+  ```json
+  {
+    "id": 1,
+    "email": "user@example.com",
+    "password": "plain_password"
+  }
+  ```
+- **Response**:
+  - `200 OK` `{ "message": "회원탈퇴되었습니다." }`
+  - `404 Bad Request` `{ "message": "올바르지못한 형식입니다." }`
+  - `500 Internal Server Error` `{ "error": "회원탈퇴에 실패했습니다." }`
+  </details>
+
+<details>
+<summary>POST /passwordCheck</summary>
+
+- **설명**: 비밀번호 확인
+- **Request Body** (`application/json`):
+  ```json
+  {
+    "id": 1,
+    "email": "user@example.com",
+    "password": "plain_password"
+  }
+  ```
+- **Response**:
+  - `200 OK` `{ "message": "비밀번호가 확인되었습니다." }`
+  - `404 Not Found` `{ "message": "패스워드가 올바르지않습니다." }`
+  - `500 Internal Server Error` `{ "error": "서버에 오류가 발생했습니다." }`
+  </details>
+
+<details>
+<summary>POST /changeUserInfo</summary>
+
+- **설명**: 사용자 정보(닉네임/비밀번호) 변경
+- **Request Body** (`application/json`):
+  ```json
+  {
+    "id": 1,
+    "nickname": "newNick", // 선택
+    "password": "newPassword" // 선택
+  }
+  ```
+- **Response**:
+  - `200 OK` `{ "message": "회원정보 변경이 완료되었습니다." }`
+  - `500 Internal Server Error` `{ "error": "회원 정보 변경에 실패했습니다." }`
+  </details>
+
+<details>
+<summary>GET /getUserNickname/:id</summary>
+
+- **설명**: 사용자 닉네임 조회
+- **Response**:
+  - `200 OK` `{ "nickname": "userNickname" }`
+  - `404 Not Found` `{ "message": "유저가 존재하지않습니다." }`
+  - `500 Internal Server Error` `{ "error": "유저 정보를 가져오는데 실패했습니다." }`
+  </details>
+
 ---
 
 ## 🐶 반려동물 (Pet)
