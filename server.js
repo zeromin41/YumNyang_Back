@@ -1,3 +1,4 @@
+require('dotenv').config();
 const fs = require("fs");
 const https = require("https");
 const argon2  = require("@node-rs/argon2");
@@ -25,7 +26,6 @@ app.use(
     )
 );
 
-require('dotenv').config();
 //https 인증서 위치
 const options = {
     key : fs.readFileSync(process.env.HTTPS_KEY),
@@ -64,19 +64,18 @@ app.post("/signUp", async (req, res) => {
         if(effectiveness(email, nickname, password)) return res.status(404).json({message : "올바르지못한 형식입니다."});
 
         const hashPassword = await argon2.hash(password, {
-            type : argon2.ArgonType.argon2id,
-            timeCost : process.env.TIME_COST,
-            memoryCost : 1 << process.env.MEMORY_COST,
-            parallelism : process.env.PARALLELISM
+            type : argon2.Algorithm.Argon2id,
+            timeCost : Number(process.env.TIME_COST),
+            memoryCost : 1 << Number(process.env.MEMORY_COST),
+            parallelism : Number(process.env.PARALLELISM)
         });
 
         await db.query('INSERT INTO USERS(EMAIL, PASSWORD, NICKNAME) VALUES(?, ?, ?)', [email, hashPassword, nickname]);
 
         const [result] = await db.query('SELECT ID FROM USERS WHERE EMAIL=?', [email]);
 
-        if(!name && !type){
-            if(!age) age = null;
-            await db.query("INSERT INTO PETS(USER_ID, NAME, TYPE, AGE) VALUES(?, ?, ?, ?)", [result[0].ID, name, type, age]);
+        if(name && type){
+            await db.query("INSERT INTO PETS(USER_ID, NAME, TYPE, AGE) VALUES(?, ?, ?, ?)", [result[0].ID, name, type, age ? age : null]);
         }
 
         console.log(`${email}  회원가입 성공`);
@@ -166,7 +165,7 @@ app.post("/login", async (req, res) => {
         if(effectiveness(email, undefined, password)) return res.status(404).json({message : "올바르지못한 형식입니다."});
 
         const [rows] = await db.query(
-        'SELECT PASSWORD FROM USERS WHERE EMAIL = ?',
+        'SELECT * FROM USERS WHERE EMAIL = ?',
         [email]
         );
 
@@ -185,6 +184,7 @@ app.post("/login", async (req, res) => {
 
         if (!valid) {
             await db.query('UPDATE USERS SET FAIL_COUNT=? WHERE EMAIL=?', [fail + 1, email]);
+            console.log("로그인 실패");
             return res.status(404).json({ message: "아이디 또는 패스워드가 올바르지않습니다." });
         }
 
@@ -196,8 +196,9 @@ app.post("/login", async (req, res) => {
 
         res.cookie('token', token, {
             httpOnly : true,
-            secure : process.env.NODE_ENV === 'production', // 정식일 땐 true로 교체
-            sameSite : 'strict',
+            secure : true, // 정식일 땐 true로 교체
+            sameSite : 'none',
+            path : "/",
             maxAge : 30 * 60 * 1000
         });
 
@@ -223,8 +224,9 @@ app.get('/checkToken', authenticateToken, (req, res) => {
 
         res.cookie('token', newToken, {
             httpOnly : true,
-            secure : process.env.NODE_ENV === 'production', // 정식일 땐 true로 교체
-            sameSite : 'strict',
+            secure : true, // 정식일 땐 true로 교체
+            sameSite : 'none',
+            path : "/",
             maxAge : 30 * 60 * 1000
         });
 
@@ -297,10 +299,10 @@ app.post('/changeUserInfo', async (req, res) => {
         if(nickname) query.push(nickname);
         if(password){
             const hashPassword = await argon2.hash(password, {
-                type : argon2.ArgonType.argon2id,
-                timeCost : process.env.TIME_COST,
-                memoryCost : 1 << process.env.MEMORY_COST,
-                parallelism : process.env.PARALLELISM
+                type : argon2.Algorithm.Argon2id,
+                timeCost : Number(process.env.TIME_COST),
+                memoryCost : 1 << Number(process.env.MEMORY_COST),
+                parallelism : Number(process.env.PARALLELISM)
             });
 
             query.push(hashPassword);
@@ -342,9 +344,7 @@ app.post("/addPetInfo", async (req, res) => {
     try {
         const { userId, name, type, age } = req.body;
 
-        if(!age) age = null;
-
-        await db.query("INSERT INTO PETS(USER_ID, NAME, TYPE, AGE) VALUES(?, ?, ?, ?)", [userId, name, type, age]);
+        await db.query("INSERT INTO PETS(USER_ID, NAME, TYPE, AGE) VALUES(?, ?, ?, ?)", [userId, name, type, age ? age : null]);
 
         console.log(`아이디 ${id}님의 펫 정보를 입력하였습니다.`);
         return res.status(200).json({message : "펫 정보가 입력되었습니다."});
@@ -641,23 +641,23 @@ app.get("/getRecipe/:id", async (req, res) => {
 // 레시피 상세 찾기
 app.post("/searchRecipe", async (req, res) => {
     try {
-        const { pet, food, ingredient } = req.body;
-
-        const [recipeIngredient] = ingredient ? await db.query("SELECT ID, USER_ID, TITLE, MAIN_IMAGE_URL, VIEW_COUNT FROM RECIPE_INGREDIENTS WHERE INGREDIENT_NAME=?", ingredient) : null;
+        //const { pet, food, ingredient } = req.body;
+        const { pet, food } = req.body;
+        //const [recipeIngredient] = ingredient ? await db.query("SELECT * FROM RECIPE_INGREDIENTS WHERE INGREDIENT_NAME=?", [ingredient]) : null;
         const check = [];
         if(pet) check.push(pet);
         if(food) check.push(food);
-        const [rows] = await db.query(`SELECT * FROM RECIPES WHERE 1=1 ${pet ? `AND TARGET_PET_TYPE=?` : ""} ${food ? `AND FOOD_CATEGORY=?` : ""}`, check);
+        const [rows] = await db.query(`SELECT * FROM RECIPES WHERE 1=1 ${pet ? ` AND TARGET_PET_TYPE=? ` : ""} ${food ? ` AND FOOD_CATEGORY=?` : ""}`, check);
 
-        const answer = recipeIngredient === null ? rows.filter(row => {
-            for(let recipe of recipeIngredient){
-                if(recipe["RECIPE_ID"] === row["ID"]) return true;
-            }
-            return false;
-        }) : rows;
+        // const answer = recipeIngredient !== null ? rows.filter(row => {
+        //     for(let recipe of recipeIngredient){
+        //         if(recipe["RECIPE_ID"] === row["ID"]) return true;
+        //     }
+        //     return false;
+        // }) : rows;
 
         console.log("레시피 상세 찾기");
-        return res.status(200).json({recipe : answer});
+        return res.status(200).json({recipe : rows});
     } catch (error) {
         console.error(error);
         return res.status(500).json({error : "레시피를 검색하는데 실패했습니다."});
