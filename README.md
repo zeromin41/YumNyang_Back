@@ -42,6 +42,38 @@
 
 </details>
 
+---
+
+## 🛠️ 서버 설정 및 기타 API
+
+<details>
+<summary>GET /getCategory</summary>
+
+- **설명**: 원료 대분류 코드 목록 조회 (외부 API 연동)
+- **Response**:
+  - `200 OK`
+    ```json
+    { "category": [ { "code": "402001", "codeNm": "농산물" }, ... ] }
+    ```
+  - `500 Internal Server Error` 오류 메시지 포함
+  </details>
+
+<details>
+<summary>POST /getIngredient</summary>
+
+- **설명**: 선택된 대분류에 해당하는 상세 원료 목록 조회 (외부 API 연동)
+- **Request Body**:
+  ```json
+  { "upperListSel": "402003" } // 선택
+  ```
+- **Response**:
+  - `200 OK`
+    ```json
+    { "ingredient": [ { "feedNm": "...", "protQy": "...", ... } ] }
+    ```
+  - `500 Internal Server Error` 오류 메시지 포함
+  </details>
+
 <details>
 <summary>POST /login</summary>
 

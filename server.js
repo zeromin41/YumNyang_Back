@@ -11,10 +11,14 @@ const cookieParser = require('cookie-parser');
 const { XMLParser } = require('fast-xml-parser');
 const path = require('path');
 const multer = require('multer');
+const winston = require('winston')
+require('winston-daily-rotate-file')
 
 const app = express();
 app.use(express.json());
 app.use(cookieParser());
+
+const UPLOAD_PATH = process.env.UPLOAD_PATH || path.join(__dirname, 'uploads');
 
 const cors = require("cors");
 app.use(
@@ -41,9 +45,13 @@ const db = mariaDB.createPool({
     database : process.env.DB_SCHEMA
 });
 
+if(!fs.existsSync(path.join(UPLOAD_PATH, 'uploads'))){
+    fs.mkdirSync(path.join(UPLOAD_PATH, 'uploads'), { recursive : true })
+}
+
 const storage = multer.diskStorage({
     destination : (req, file, cb) => {
-        cb(null, path.join(__dirname, 'uploads'));
+        cb(null, path.join(UPLOAD_PATH, 'uploads'));
     },
     filename : (req, file, cb) => {
         cb(null, Date.now() + '-' + file.originalname);
@@ -51,6 +59,35 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage });
+
+const logDir = path.join(__dirname, 'logs');
+if (!fs.existsSync(logDir)) {
+  fs.mkdirSync(logDir);
+}
+
+const transport = new winston.transports.DailyRotateFile({
+    dirname : logDir,
+    filename : '%DATE%.log',
+    datePattern : 'YYYY-MM-DD',
+    zippedArchive : false,
+    maxSize : '20m',
+    maxFiles : '14d'
+});
+
+const logger = winston.createLogger({
+    level : 'info',
+    format : winston.format.combine(
+        winston.format.timestamp({ format : 'YYYY-MM-DD HH:mm:ss'}),
+        winston.format.printf(({ timestamp, level, message }) => `${timestamp} ${level} : ${message}`)
+    ),
+
+    transports : [
+        transport,
+        new winston.transports.Console()
+    ]
+});
+
+
 
 /**
  * 회원 관리
@@ -78,10 +115,10 @@ app.post("/signUp", async (req, res) => {
             await db.query("INSERT INTO PETS(USER_ID, NAME, TYPE, AGE) VALUES(?, ?, ?, ?)", [result[0].ID, name, type, age ? age : null]);
         }
 
-        console.log(`${email}  회원가입 성공`);
+        logger.info(`${email}  회원가입 성공`);
         return res.status(200).json({message : "회원가입이 완료되었습니다."});
     } catch (error) {
-        console.error(error)
+        logger.error(error)
         return res.status(500).json({error : "회원가입에 실패했습니다."})
     }
 });
@@ -99,7 +136,7 @@ app.post("/checkId", async (req, res) => {
         
         return res.status(200).json({message : "사용가능한 아이디입니다."});
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(500).json({error : "서버에 문제가 발생했습니다."});
     }
 });
@@ -117,7 +154,7 @@ app.post("/checkNickname", async (req, res) => {
         
         return res.status(200).json({message : "사용가능한 닉네임입니다."});
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(500).json({error : "서버에 문제가 발생했습니다."});
     }
 });
@@ -146,13 +183,19 @@ app.post("/withdraw", async (req, res) => {
 
         await db.query("DELETE FROM USERS WHERE EMAIL=?", [email]);
         await db.query("DELETE FROM TOKEN_USER WHERE EMAIL=?", [email]);
-        res.clearCookie('token');
+        res.clearCookie('token', {
+            httpOnly : true,
+            secure : true, // 정식일 땐 true로 교체
+            sameSite : 'none',
+            path : "/",
+            maxAge : 0
+        });
         
-        console.log(`${email}님이 회원을 탈퇴했습니다.`);
+        logger.info(`${email}님이 회원을 탈퇴했습니다.`);
         return res.status(200).json({message : "회원탈퇴되었습니다."});
 
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(500).json({error : "회원탈퇴에 실패했습니다."});
     }
 });
@@ -184,7 +227,7 @@ app.post("/login", async (req, res) => {
 
         if (!valid) {
             await db.query('UPDATE USERS SET FAIL_COUNT=? WHERE EMAIL=?', [fail + 1, email]);
-            console.log("로그인 실패");
+            logger.info("로그인 실패");
             return res.status(404).json({ message: "아이디 또는 패스워드가 올바르지않습니다." });
         }
 
@@ -205,10 +248,10 @@ app.post("/login", async (req, res) => {
         const id = rows[0].ID;
         const nickname = rows[0].NICKNAME;
 
-        console.log(`${nickname}님이 로그인했습니다.`);
+        logger.info(`${nickname}님이 로그인했습니다.`);
         return res.status(200).json({ message: `${nickname}님 환영합니다.`, number : id });
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(500).json({ error: "로그인 중 오류가 발생했습니다." });
     }
 });
@@ -230,14 +273,14 @@ app.get('/checkToken', authenticateToken, (req, res) => {
             maxAge : 30 * 60 * 1000
         });
 
-        console.log(`${payload.email}님의 token이 업데이트 되었습니다.`);
+        logger.info(`${payload.email}님의 token이 업데이트 되었습니다.`);
 
         return res.status(200).json({
             authenticated : true,
             user : req.user
         });
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(500).json({error : "비정상적 접근입니다."});
     }
 });
@@ -251,12 +294,18 @@ app.post('/logout', authenticateToken, async (req, res) => {
 
         await db.query("DELETE FROM TOKEN_USER WHERE EMAIL=?", [email]);
 
-        res.clearCookie('token');
+        res.clearCookie('token', {
+            httpOnly : true,
+            secure : true, // 정식일 땐 true로 교체
+            sameSite : 'none',
+            path : "/",
+            maxAge : 0
+        });
         
-        console.log(`${email}님이 로그아웃했습니다.`);
+        logger.info(`${email}님이 로그아웃했습니다.`);
         return res.status(200).json({message : "로그아웃되었습니다."});
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(500).json({error : "로그아웃에 실패했습니다."})
     }
 });
@@ -285,7 +334,7 @@ app.post('/passwordCheck', async (req, res) => {
 
         return res.status(200).json({message : "비밀번호가 확인되었습니다."});
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(500).json({error : "서버에 오류가 발생했습니다."});
     }
 });
@@ -295,8 +344,12 @@ app.post('/changeUserInfo', async (req, res) => {
     const { id, nickname, password } = req.body;
     try {
 
+        const assignments = [];
         const query = [];
-        if(nickname) query.push(nickname);
+        if(nickname) {
+            assignments.push('NICKNAME=?')
+            query.push(nickname)
+        }
         if(password){
             const hashPassword = await argon2.hash(password, {
                 type : argon2.Algorithm.Argon2id,
@@ -305,16 +358,17 @@ app.post('/changeUserInfo', async (req, res) => {
                 parallelism : Number(process.env.PARALLELISM)
             });
 
+            assignments.push('PASSWORD=?')
             query.push(hashPassword);
         }
         query.push(id);
 
-        await db.query(`UPDATE USERS SET ${nickname ? "NICKNAME=?," : ""} ${password ? "PASSWORD=?" : ""} WHERE ID=?`, query);
+        await db.query(`UPDATE USERS SET ${assignments.join(', ')} WHERE ID=?`, query);
 
-        console.log(`${id} 회원정보 변경 성공`);
+        logger.info(`${id} 회원정보 변경 성공`);
         return res.status(200).json({message : "회원정보 변경이 완료되었습니다."});
     } catch (error) {
-        console.error(error)
+        logger.error(error)
         return res.status(500).json({error : "회원 정보 변경에 실패했습니다."});
     }
 });
@@ -330,7 +384,7 @@ app.get("/getUserNickname/:id", async (req, res) => {
 
         return res.status(200).json({nickname : rows[0]});
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(500).json({error : "유저 정보를 가져오는데 실패했습니다."});
     }
 });
@@ -346,10 +400,10 @@ app.post("/addPetInfo", async (req, res) => {
 
         await db.query("INSERT INTO PETS(USER_ID, NAME, TYPE, AGE) VALUES(?, ?, ?, ?)", [userId, name, type, age ? age : null]);
 
-        console.log(`아이디 ${id}님의 펫 정보를 입력하였습니다.`);
+        logger.info(`아이디 ${userId}님의 펫 정보를 입력하였습니다.`);
         return res.status(200).json({message : "펫 정보가 입력되었습니다."});
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(500).json({error : "반려동물 정보를 입력하는데 실패했습니다."});
     }
 });
@@ -361,10 +415,10 @@ app.post("/UpdatePetInfo", async (req, res) => {
 
         await db.query("UPDATE PETS SET NAME=?, TYPE=?, AGE=? WHERE ID=?", [name, type, age, id]);
 
-        console.log(`아이디 ${userId}님의 펫 정보를 변경하였습니다.`);
+        logger.info(`아이디 ${userId}님의 펫 정보를 변경하였습니다.`);
         return res.status(200).json({message : "펫 정보가 변경되었습니다."});
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(500).json({error : "반려동물 정보를 변경하는데 실패했습니다."});
     }
 });
@@ -374,13 +428,13 @@ app.get("/getPetInfo/:userId", async (req, res) => {
     try {
         const { userId } = req.params;
 
-        const [rows] = await db.query("SELECT * FROM PETS USER_ID=?", [userId]);
+        const [rows] = await db.query("SELECT * FROM PETS WHERE USER_ID=?", [userId]);
 
         if(rows.length === 0) return res.status(404).json({message : "등록된 펫이 없습니다."});
-        console.log(`${userId}님의 등록된 펫을 가져옵니다.`);
+        logger.info(`${userId}님의 등록된 펫을 가져옵니다.`);
         return res.status(200).json({pets : rows});
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(500).json({error : "반려동물 정보를 가져오는데 실패했습니다."});
     }
 });
@@ -392,10 +446,10 @@ app.post("/removePetInfo/:id", async (req, res) => {
 
         await db.query("DELETE FROM PETS WHERE ID=?", [id]);
 
-        console.log(`${id}를 삭제했습니다.`);
+        logger.info(`${id}를 삭제했습니다.`);
         return res.status(200).json({message : "반려동물 정보를 삭제했습니다."});
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(500).json({error : "반려동물 정보를 삭제하는데 실패했습니다."});
     }
 })
@@ -432,10 +486,10 @@ app.get("/getCategory", async (req, res) => {
             codeNm : i.codeNm.value
         }));
 
-        console.log("분류 코드 가져오기");
+        logger.info("분류 코드 가져오기");
         return res.status(200).json({ category: cleanItems });
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(500).json({
             message: error.message,
             ...(error.response && { details: error.response.data }),
@@ -456,7 +510,7 @@ app.post("/getIngredient", async (req, res) => {
 
         const parser = new XMLParser(options);
 
-        const test = await axios.get(`http://api.nongsaro.go.kr/service/feedRawMaterial/feedRawMaterialAllList?apiKey=${process.env.ANIMAL_FOOD_API}${upperListSel !== "" ? `&upperListSel=${upperListSel}` : ""}`);
+        const test = await axios.get(`http://api.nongsaro.go.kr/service/feedRawMaterial/feedRawMaterialAllList?apiKey=${process.env.ANIMAL_FOOD_API}${upperListSel ? `&upperFeedClCode=${upperListSel}` : ""}`);
 
         const jsonObj = parser.parse(test.data);
 
@@ -464,16 +518,17 @@ app.post("/getIngredient", async (req, res) => {
         const cleanItems = items.map(i => {
             const obj = {};
             for(const [key, node] of Object.entries(i)){
-                obj[key] = (node && typeof node === 'object' && 'value' in node) ? node.value : node;
+                if(['feedNm', 'mitrQy', 'protQy', 'clciQy', 'phphQy', 'fatQy', 'crbQy', 'totEdblfibrQy', 'naQy', 'ptssQy'].includes(key))
+                    obj[key] = (node && typeof node === 'object' && 'value' in node) ? node.value : node;
             }
 
             return obj;
         });
 
-        console.log("집밥원료 가져오기");
+        logger.info("집밥원료 가져오기");
         return res.status(200).json({ ingredient: cleanItems });
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(500).json({
             message: error.message,
             ...(error.response && { details: error.response.data }),
@@ -486,6 +541,8 @@ app.post("/AddRecipe", upload.array('images', 10), async (req, res) => {
     try {
         const files = req.files;
 
+        console.log(files)
+
         const urls = files.length > 0 ? files.map(f =>
             `${req.protocol}://${req.hostname}/uploads/${f.filename}`
         ) : null;
@@ -495,7 +552,7 @@ app.post("/AddRecipe", upload.array('images', 10), async (req, res) => {
         
         const {userId, title, description, targetPetType, foodCategory, cookingTimeLimit, level, caloriesPerServing, favoritesCount, carbs, protein, fat, calcium, phosphorus, moisture, fiber, ingredientsName, ingredientsAmount, ingredientsUnit} = req.body;
         await db.query(
-            "INSERT INTO RECIPES(USER_ID, TITLE, MAIN_IMAGE_URL, TARGET_PET_TYPE, FOOD_CATEGORY, COOKING_TIME_LIMIT, LEVEL, CALORIES_PER_SERVING, FAVORITES_COUNT, NUTRITIONAL_INFO_CARBS_G, NUTRITIONAL_INFO_PROTEIN_G, NUTRITIONAL_INFO_FAT_G, NUTRITIONAL_INFO_CALCIUM_G, NUTRITIONAL_INFO_PHOSPHORUS_G, NUTRITIONAL_INFO_MOISTURE_PERCENT, NUTRITIONAL_INFO_FIBER_G) VALUE(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO RECIPES(USER_ID, TITLE, MAIN_IMAGE_URL, TARGET_PET_TYPE, FOOD_CATEGORY, COOKING_TIME_LIMIT, LEVEL, CALORIES_PER_SERVING, FAVORITES_COUNT, NUTRITIONAL_INFO_CARBS_G, NUTRITIONAL_INFO_PROTEIN_G, NUTRITIONAL_INFO_FAT_G, NUTRITIONAL_INFO_CALCIUM_G, NUTRITIONAL_INFO_PHOSPHORUS_G, NUTRITIONAL_INFO_MOISTURE_PERCENT, NUTRITIONAL_INFO_FIBER_G) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             , [userId, title, mainImage, targetPetType, foodCategory, cookingTimeLimit, level, caloriesPerServing, favoritesCount, carbs, protein, fat, calcium, phosphorus, moisture, fiber]
         );
 
@@ -511,10 +568,10 @@ app.post("/AddRecipe", upload.array('images', 10), async (req, res) => {
             }
         }
 
-        console.log("레시피 추가 완료");
+        logger.info("레시피 추가 완료");
         return res.status(200).json({message : "레시피 추가가 완료되었습니다."});
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(500).json({error : "레시피 추가에 실패했습니다."});
     }
 });
@@ -531,15 +588,17 @@ app.post("/updateRecipe", upload.array("newImages", 10), async (req, res) => {
         const toDelete = existing.filter(img => img.IMAGE_URL === null ? false : !keepUrls.includes(img.IMAGE_URL));
 
         for(let img of toDelete){
-            const filePath = path.join(__dirname, img.url);
+            if(img.IMAGE_URL === null) continue;
+            const relativePath = img.IMAGE_URL.split("/uploads/")[1];
+            const filePath = path.join(UPLOAD_PATH, 'uploads', relativePath);
 
             fs.unlink(filePath, err => {
-                if(err) console.error("delete file error", err);
+                if(err) logger.error("delete file error", err);
             });
         }
 
         if(toDelete.length > 0){
-            const ids = toDelete.map(i => i.id);
+            const ids = toDelete.map(i => i.ID);
 
             await db.query("DELETE FROM DESCRIPTION WHERE ID IN (?)", [ids]);
         }
@@ -578,10 +637,10 @@ app.post("/updateRecipe", upload.array("newImages", 10), async (req, res) => {
             }
         }
 
-        console.log(`아이디 ${recipeId}가 변경되었습니다.`);
+        logger.info(`아이디 ${recipeId}가 변경되었습니다.`);
         return res.status(200).json({message : "레시피가 수정되었습니다."});
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(500).json({error : "레시피를 수정하는데 실패했습니다."});
     }
 });
@@ -594,8 +653,8 @@ app.get("/removeRecipe/:id", async (req, res) => {
 
         for(let img of images){
             if(img.IMAGE_URL === null) continue;
-            const relativePath = img.url.split("/uploads/")[1];
-            const filePath = path.join(__dirname, 'uploads', relativePath);
+            const relativePath = img.IMAGE_URL.split("/uploads/")[1];
+            const filePath = path.join(UPLOAD_PATH, 'uploads', relativePath);
 
             if(fs.existsSync(filePath)) fs.unlinkSync(filePath);
         }
@@ -605,10 +664,10 @@ app.get("/removeRecipe/:id", async (req, res) => {
 
         await db.query("DELETE FROM RECIPES WHERE ID=?", [id]);
 
-        console.log(`아이디 ${id} 레시피 삭제 완료`);
+        logger.info(`아이디 ${id} 레시피 삭제 완료`);
         return res.status(200).json({message : "레시피가 삭제되었습니다."});
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(500).json({error : "레시피 삭제에 실패했습니다."});
     }
 });
@@ -630,10 +689,10 @@ app.get("/getRecipe/:id", async (req, res) => {
 
         const [ingredient] = await db.query("SELECT * FROM RECIPE_INGREDIENTS WHERE RECIPE_ID=?", [id]);
 
-        console.log(`아이디 ${id} 레시피 불러오기`);
+        logger.info(`아이디 ${id} 레시피 불러오기`);
         return res.status(200).json({recipe : recipe[0], description : description, ingredient : ingredient});
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(500).json({error : "레시피를 불러오는데 실패했습니다."});
     }
 });
@@ -641,25 +700,17 @@ app.get("/getRecipe/:id", async (req, res) => {
 // 레시피 상세 찾기
 app.post("/searchRecipe", async (req, res) => {
     try {
-        //const { pet, food, ingredient } = req.body;
-        const { pet, food } = req.body;
-        //const [recipeIngredient] = ingredient ? await db.query("SELECT * FROM RECIPE_INGREDIENTS WHERE INGREDIENT_NAME=?", [ingredient]) : null;
+
+        const { title, pet, food } = req.body;
         const check = [];
         if(pet) check.push(pet);
         if(food) check.push(food);
-        const [rows] = await db.query(`SELECT * FROM RECIPES WHERE 1=1 ${pet ? ` AND TARGET_PET_TYPE=? ` : ""} ${food ? ` AND FOOD_CATEGORY=?` : ""}`, check);
+        const [rows] = await db.query(`SELECT * FROM RECIPES WHERE 1=1 ${title ? `AND TITLE LIKE '%${title}%'` : ""} ${pet ? ` AND TARGET_PET_TYPE=? ` : ""} ${food ? ` AND FOOD_CATEGORY IN (?)` : ""}`, check);
 
-        // const answer = recipeIngredient !== null ? rows.filter(row => {
-        //     for(let recipe of recipeIngredient){
-        //         if(recipe["RECIPE_ID"] === row["ID"]) return true;
-        //     }
-        //     return false;
-        // }) : rows;
-
-        console.log("레시피 상세 찾기");
+        logger.info("레시피 상세 찾기");
         return res.status(200).json({recipe : rows});
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(500).json({error : "레시피를 검색하는데 실패했습니다."});
     }
 });
@@ -668,14 +719,14 @@ app.get("/getMyRecipe/:userId", async (req, res) => {
     try {
         const { userId } = req.params;
 
-        const [rows] = await db.query("SELECT ID, MAIN_IMAGE_URL, TITLE FROM RECIPES WHERE USER_ID=?", [userId]);
+        const [rows] = await db.query("SELECT ID, MAIN_IMAGE_URL, TITLE, VIEW_COUNT FROM RECIPES WHERE USER_ID=?", [userId]);
 
         if(rows.length === 0) return res.status(404).json({message : "레시피가 없습니다."});
 
-        console.log(`${userId}님의 나의 레시피를 불러옵니다.`);
+        logger.info(`${userId}님의 나의 레시피를 불러옵니다.`);
         return res.status(200).json({recipe : rows});
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(500).json({error : "나의 레시피를 찾는데 실패했습니다."});
     }
 });
@@ -687,14 +738,14 @@ app.get("/getMyRecipe/:userId", async (req, res) => {
 // 리뷰 추가
 app.post("/addReview", async (req, res) => {
     try {
-        const { recipeId, userId, ratingScore, commentText } = req.body;
+        const { recipeId, userId, nickname, ratingScore, commentText } = req.body;
 
-        await db.query("INSERT INTO REVIEWS(RECIPE_ID, USER_ID, RATING_SCORE, COMMENT_TEXT) VALUES(?, ?, ?, ?)", [recipeId, userId, ratingScore, commentText]);
+        await db.query("INSERT INTO REVIEWS(RECIPE_ID, USER_ID, NICKNAME RATING_SCORE, COMMENT_TEXT) VALUES(?, ?, ?, ?, ?)", [recipeId, userId, nickname, ratingScore, commentText]);
 
-        console.log(`${userId}님이 ${recipeId}에 리뷰를 등록했습니다.`);
+        logger.info(`${userId}님이 ${recipeId}에 리뷰를 등록했습니다.`);
         return res.status(200).json({message : "리뷰가 정상적으로 등록되었습니다."});
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(500).json({error : "리뷰 추가에 실패했습니다."});
     }
 });
@@ -704,14 +755,14 @@ app.get("/getReview/:recipeId", async (req, res) => {
     try {
         const { recipeId } = req.params;
 
-        const [rows] = await db.query("SELECT * FROM REVIEWS FROM RECIPE_ID=?", [recipeId]);
+        const [rows] = await db.query("SELECT * FROM REVIEWS WHERE RECIPE_ID=?", [recipeId]);
 
         if(rows.length === 0) return res.status(404).json({error : "리뷰가 없습니다."});
 
-        console.log(`${recipeId}의 리뷰를 가져옵니다.`);
+        logger.info(`${recipeId}의 리뷰를 가져옵니다.`);
         return res.status(200).json({review : rows});
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(500).json({error : "리뷰 찾기를 실패했습니다"});
     }
 });
@@ -720,14 +771,14 @@ app.get("/getReview/:recipeId", async (req, res) => {
 app.post("/upDateReview", async (req, res) => {
     const { id, type, ratingScore, commentText } = req.body;
     try {
-        type === "update" ? await db.query("UPDATE REVIEWS SET RATING_SCORE=? AND COMMENT_TEXT=? FROM WHERE ID=?", [ratingScore, commentText, id])
+        type === "update" ? await db.query("UPDATE REVIEWS SET RATING_SCORE=?, COMMENT_TEXT=? WHERE ID=?", [ratingScore, commentText, id])
                           : type === "delete" ? await db.query("DELETE FROM REVIEWS WHERE ID=?", [id])
                           : null;
 
-        console.log(`리뷰 아이디 ${id}를 ${type === "update" ? "업데이트" : type === "delete" ? "삭제" : "비정상 접근을"} 했습니다.`);
+        logger.info(`리뷰 아이디 ${id}를 ${type === "update" ? "업데이트" : type === "delete" ? "삭제" : "비정상 접근을"} 했습니다.`);
         return res.status(200).json({message : type === "update" ? "업데이트 성공" : type === "delete" ? "삭제 성공" : "비정상 접근입니다."});
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(500).json({error : `${type === "update" ? "리뷰 업데이트를 실패했습니다." : type === "delete" ? "리뷰 삭제를 실패했습니다." : "비정상 접근입니다."}`});
     }
 });
@@ -740,10 +791,10 @@ app.get("/getMyReview/:userId", async (req, res) => {
 
         if(rows.length === 0) return res.status(404).json({message : "리뷰가 없습니다."});
 
-        console.log(`${userId}님이 작성하신 리뷰를 가져옵니다.`);
+        logger.info(`${userId}님이 작성하신 리뷰를 가져옵니다.`);
         return res.status(200).json({reviews : rows});
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(500).json({error : "나의 리뷰를 가져오는데 실패했습니다."});
     }
 })
@@ -758,10 +809,10 @@ app.post("/addFavorites", async (req, res) => {
         const { userId, recipeId } = req.body;
         await db.query("INSERT INTO FAVORITES(USER_ID, RECIPE_ID) VALUES(?, ?)", [userId, recipeId]);
 
-        console.log(`${userId}님이 ${recipeId}를 즐겨찾기에 추가했습니다.`);
+        logger.info(`${userId}님이 ${recipeId}를 즐겨찾기에 추가했습니다.`);
         return res.status(200).json({message : "즐겨찾기 추가"});
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(500).json({error : "즐겨찾기 추가를 실패했습니다."});
     }
 });
@@ -771,12 +822,20 @@ app.get("/getFavorites/:userId", async (req, res) => {
     try {
         const { userId } = req.params;
 
-        const [rows] = await db.query("SELECT * FROM FAVORITES WHERE USER_ID=?", [userId]);
+        const [favorites] = await db.query("SELECT * FROM FAVORITES WHERE USER_ID=?", [userId]);
 
-        console.log(`${userId}님의 즐겨찾기를 찾았습니다.`);
-        return res.status(200).json({favorites : rows});
+        const recipeIds = favorites.map(e => e.RECIPE_ID);
+
+        const [recipes] = favorites.length > 0 ? await db.query(
+            "SELECT ID, USER_ID, TITLE, MAIN_IMAGE_URL, VIEW_COUNT FROM RECIPES WHERE ID IN (?)",
+            [recipeIds]
+        ) : null;
+
+        logger.info(`${userId}님의 즐겨찾기를 찾았습니다.`);
+
+        return res.status(200).json({ favorites, recipes});
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(500).json({error : "즐겨찾기를 찾는데 실패했습니다."});
     }
 });
@@ -787,10 +846,10 @@ app.get("/removeFavorites/:id", async (req, res) => {
         const { id } = req.params;
         await db.query("DELETE FROM FAVORITES WHERE ID=?", [id]);
 
-        console.log(`즐겨찾기 아이디 ${id} 삭제`);
+        logger.info(`즐겨찾기 아이디 ${id} 삭제`);
         return res.status(200).json({message : "즐겨찾기 삭제"});
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(500).json({error : "즐겨찾기 삭제를 실패했습니다."});
     }
 });
@@ -806,10 +865,10 @@ app.post("/addRecentlyView", async (req, res) => {
 
         await db.query("INSERT INTO RECENTLY_VIEWED_RECIPES(USER_ID, RECIPE_ID) VALUES(?, ?)", [userId, recipeId]);
 
-        console.log(`${userId}님이 ${recipeId}를 봤습니다.`);
+        logger.info(`${userId}님이 ${recipeId}를 봤습니다.`);
         return res.status(200).json({message : "최근 본 레시피 추가 완료"});
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(500).json({error : "서버에 문제가 발생했습니다."});
     }
 });
@@ -819,12 +878,19 @@ app.get("/getRecentlyView/:userId", async (req, res) => {
     try {
         const { userId } = req.params;
 
-        const [rows] = await db.query("SELECT * FROM RECENTLY_VIEWED_RECIPES WHERE USER_ID=?", [userId]);
+        const [recentlyView] = await db.query("SELECT * FROM RECENTLY_VIEWED_RECIPES WHERE USER_ID=?", [userId]);
 
-        console.log(`${userId}님의 최근 본 레시피를 불러옵니다.`);
-        return res.status(200).json({recentlyView : rows});
+        const recipeIds = recentlyView.map(e => e.RECIPE_ID);
+
+        const [recipes] = recentlyView.length > 0 ? await db.query(
+            "SELECT ID, USER_ID, TITLE, MAIN_IMAGE_URL, VIEW_COUNT FROM RECIPES WHERE ID IN (?)",
+            [recipeIds]
+        ) : null;
+
+        logger.info(`${userId}님의 최근 본 레시피를 불러옵니다.`);
+        return res.status(200).json({recentlyView, recipes});
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(500).json({error : "서버에 문제가 발생했습니다"});
     }
 });
@@ -834,33 +900,33 @@ app.get("/getPopularity", async (req, res) => {
     try {
         const [rows] = await db.query("SELECT ID, USER_ID, TITLE, MAIN_IMAGE_URL, VIEW_COUNT FROM RECIPES ORDER BY VIEW_COUNT DESC LIMIT 5");
 
-        console.log("인기있는 레시피 5개를 추출합니다.");
+        logger.info("인기있는 레시피 5개를 추출합니다.");
         return res.status(200).json({popularity : rows});
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         return res.status(500).json({error : "서버에 문제가 발생했습니다."});
     }
 })
 
-https.createServer(options, app).listen(3333, () => console.log("서버가 연결되었습니다."));
+https.createServer(options, app).listen(3333, () => logger.info("서버가 연결되었습니다."));
 
 function authenticateToken(req, res, next) {
     const token = req.cookies.token;
 
     if(!token) return res.status(404).json({ message : "토큰이 없습니다."});
 
-    jwt.verify(token, jwtSecret, async (err, user) => {
+    return jwt.verify(token, jwtSecret, async (err, user) => {
         if(err) return res.status(401).json({ message : "유효하지 않은 토큰입니다."});
 
-        const nowToken = await db.query("SELECT * FROM TOKEN_USER WHERE EMAIL=? AND TOKEN=?", [user, token]);
+        const [nowToken] = await db.query("SELECT * FROM TOKEN_USER WHERE EMAIL=? AND TOKEN=?", [user.email, token]);
 
-        if(nowToken === 0) {
+        if(nowToken.length === 0) {
             res.clearCookie('token');
             return res.status(401).json({message : "다른 곳에서 로그인을 시도했습니다.\n안전을 위해 로그아웃되었습니다."});
         }
 
         req.user = user;
-        next();
+        return next();
     })
 }
 
