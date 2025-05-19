@@ -257,13 +257,15 @@ app.post("/login", async (req, res) => {
 });
 
 // 회원 토큰 관리
-app.get('/checkToken', authenticateToken, (req, res) => {
+app.get('/checkToken', authenticateToken, async (req, res) => {
     try {
-        const payload = { email : req.user.email};
+        const payload = { email : req.user.email };
 
         if(effectiveness(payload.email, undefined, undefined)) return res.status(404).json({message : "올바르지못한 형식입니다."});
 
         const newToken = jwt.sign(payload, jwtSecret, {expiresIn : '30m'});
+
+        await db.query('INSERT INTO TOKEN_USER(EMAIL, TOKEN) VALUES(?, ?) ON DUPLICATE KEY UPDATE TOKEN=?', [payload.email, newToken, newToken]);
 
         res.cookie('token', newToken, {
             httpOnly : true,
@@ -550,10 +552,10 @@ app.post("/AddRecipe", upload.array('images', 10), async (req, res) => {
         const mainImage = urls ? urls[0] : null;
         const descriptionImage = urls ? urls.slice(1) : null;
         
-        const {userId, title, description, targetPetType, foodCategory, cookingTimeLimit, level, caloriesPerServing, favoritesCount, carbs, protein, fat, calcium, phosphorus, moisture, fiber, ingredientsName, ingredientsAmount, ingredientsUnit} = req.body;
+        const {userId, nickname, title, description, targetPetType, foodCategory, cookingTimeLimit, level, caloriesPerServing, favoritesCount, carbs, protein, fat, calcium, phosphorus, moisture, fiber, ingredientsName, ingredientsAmount, ingredientsUnit} = req.body;
         await db.query(
-            "INSERT INTO RECIPES(USER_ID, TITLE, MAIN_IMAGE_URL, TARGET_PET_TYPE, FOOD_CATEGORY, COOKING_TIME_LIMIT, LEVEL, CALORIES_PER_SERVING, FAVORITES_COUNT, NUTRITIONAL_INFO_CARBS_G, NUTRITIONAL_INFO_PROTEIN_G, NUTRITIONAL_INFO_FAT_G, NUTRITIONAL_INFO_CALCIUM_G, NUTRITIONAL_INFO_PHOSPHORUS_G, NUTRITIONAL_INFO_MOISTURE_PERCENT, NUTRITIONAL_INFO_FIBER_G) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-            , [userId, title, mainImage, targetPetType, foodCategory, cookingTimeLimit, level, caloriesPerServing, favoritesCount, carbs, protein, fat, calcium, phosphorus, moisture, fiber]
+            "INSERT INTO RECIPES(USER_ID, NICKNAME, TITLE, MAIN_IMAGE_URL, TARGET_PET_TYPE, FOOD_CATEGORY, COOKING_TIME_LIMIT, LEVEL, CALORIES_PER_SERVING, FAVORITES_COUNT, NUTRITIONAL_INFO_CARBS_G, NUTRITIONAL_INFO_PROTEIN_G, NUTRITIONAL_INFO_FAT_G, NUTRITIONAL_INFO_CALCIUM_G, NUTRITIONAL_INFO_PHOSPHORUS_G, NUTRITIONAL_INFO_MOISTURE_PERCENT, NUTRITIONAL_INFO_FIBER_G) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            , [userId, nickname, title, mainImage, targetPetType, foodCategory, cookingTimeLimit, level, caloriesPerServing, favoritesCount, carbs, protein, fat, calcium, phosphorus, moisture, fiber]
         );
 
         const [result] = await db.query('SELECT ID FROM RECIPES WHERE USER_ID =? AND TITLE = ?', [userId, title]);
@@ -740,7 +742,7 @@ app.post("/addReview", async (req, res) => {
     try {
         const { recipeId, userId, nickname, ratingScore, commentText } = req.body;
 
-        await db.query("INSERT INTO REVIEWS(RECIPE_ID, USER_ID, NICKNAME RATING_SCORE, COMMENT_TEXT) VALUES(?, ?, ?, ?, ?)", [recipeId, userId, nickname, ratingScore, commentText]);
+        await db.query("INSERT INTO REVIEWS(RECIPE_ID, USER_ID, NICKNAME, RATING_SCORE, COMMENT_TEXT) VALUES(?, ?, ?, ?, ?)", [recipeId, userId, nickname, ratingScore, commentText]);
 
         logger.info(`${userId}님이 ${recipeId}에 리뷰를 등록했습니다.`);
         return res.status(200).json({message : "리뷰가 정상적으로 등록되었습니다."});
@@ -878,7 +880,7 @@ app.get("/getRecentlyView/:userId", async (req, res) => {
     try {
         const { userId } = req.params;
 
-        const [recentlyView] = await db.query("SELECT * FROM RECENTLY_VIEWED_RECIPES WHERE USER_ID=?", [userId]);
+        const [recentlyView] = await db.query("SELECT DISTINCT A.USER_ID, A.RECIPE_ID FROM ( SELECT * FROM RECENTLY_VIEWED_RECIPES WHERE USER_ID=? ORDER BY ID DESC ) AS A LIMIT 5", [userId]);
 
         const recipeIds = recentlyView.map(e => e.RECIPE_ID);
 
@@ -922,6 +924,7 @@ function authenticateToken(req, res, next) {
 
         if(nowToken.length === 0) {
             res.clearCookie('token');
+            logger.info(`중복 로그인 제거`);
             return res.status(401).json({message : "다른 곳에서 로그인을 시도했습니다.\n안전을 위해 로그아웃되었습니다."});
         }
 
