@@ -1,3 +1,15 @@
+// const requiredEnv = [
+//   'DB_HOST','DB_PORT','DB_USER','DB_PASSWORD','DB_SCHEMA',
+//   'HTTPS_KEY','HTTPS_CERT','HTTPS_CA',
+//   'JWT_SECRET'
+// ];
+
+// const missing = requiredEnv.filter(name => !process.env[name]);
+// if (missing.length > 0) {
+//   console.error('Missing required environment variables:', missing.join(', '));
+//   process.exit(1);
+// }
+
 require('dotenv').config();
 const fs = require("fs");
 const https = require("https");
@@ -24,7 +36,7 @@ const cors = require("cors");
 app.use(
     cors(
         {
-            origin : [ 'http://localhost:5173', 'https://seungwoo.i234.me' ],
+            origin : [ process.env.LOCALHOST, process.env.MY_HOST ],
             credentials : true
         }
     )
@@ -45,25 +57,24 @@ const db = mariaDB.createPool({
     database : process.env.DB_SCHEMA
 });
 
-if(!fs.existsSync(path.join(UPLOAD_PATH, 'uploads'))){
-    fs.mkdirSync(path.join(UPLOAD_PATH, 'uploads'), { recursive : true })
-}
+fs.promises.mkdir(UPLOAD_PATH, { recursive: true })
+  .catch(err => console.error(`Failed to create upload directory ${UPLOAD_PATH}`, err));
 
 const storage = multer.diskStorage({
     destination : (req, file, cb) => {
-        cb(null, path.join(UPLOAD_PATH, 'uploads'));
+        cb(null, UPLOAD_PATH);
     },
     filename : (req, file, cb) => {
         cb(null, Date.now() + '-' + file.originalname);
     }
 });
 
-const upload = multer({ storage });
+const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 }});
 
 const logDir = path.join(__dirname, 'logs');
-if (!fs.existsSync(logDir)) {
-  fs.mkdirSync(logDir);
-}
+// ensure log directory exists (async)
+fs.promises.mkdir(logDir, { recursive: true })
+  .catch(err => console.error(`Failed to create log directory ${logDir}`, err));
 
 const transport = new winston.transports.DailyRotateFile({
     dirname : logDir,
@@ -460,6 +471,11 @@ app.post('/changeUserInfo', async (req, res) => {
         }
         query.push(id);
 
+        if(assignments.length === 0){
+            logger.error("변경할 항목이 없습니다.");
+            return res.status(500).json({ message: "변경할 항목을 하나 이상 지정하세요." });
+        }
+
         await conn.query(`UPDATE USERS SET ${assignments.join(', ')} WHERE ID=?`, query);
 
         await conn.commit();
@@ -688,8 +704,8 @@ app.post("/AddRecipe", upload.array('images', 10), async (req, res) => {
 
         const [result] = await conn.query('SELECT ID FROM RECIPES WHERE USER_ID =? AND TITLE = ?', [userId, title]);
 
-        const description = JSON.parse(descriptionJSON)
-        const ingredientsName = JSON.parse(ingredientsNameJSON), ingredientsAmount = JSON.parse(ingredientsAmountJSON), ingredientsUnit = JSON.parse(ingredientsUnitJSON)
+        const description = JSON.parse(descriptionJSON || '[]')
+        const ingredientsName = JSON.parse(ingredientsNameJSON || '[]'), ingredientsAmount = JSON.parse(ingredientsAmountJSON || '[]'), ingredientsUnit = JSON.parse(ingredientsUnitJSON || '[]')
 
         for(const index in description){
             await conn.query('INSERT INTO DESCRIPTION(RECIPE_ID, FLOW, DESCRIPTION, IMAGE_URL) VALUES (?, ?, ?, ?)', [result[0].ID, index, description[index], descriptionImage === null ? null : descriptionImage[index]]);
@@ -720,20 +736,29 @@ app.post("/updateRecipe", upload.array("newImages", 10), async (req, res) => {
     try {
         const recipeId = req.body.recipeId;
         const keepUrls = JSON.parse(req.body.keepUrls || '[]');
-        const {userId, title, description, targetPetType, foodCategory, cookingTimeLimit, level, caloriesPerServing, favoritesCount, carbs, protein, fat, calcium, phosphorus, moisture, fiber, mainChange, descriptionChange, ingredientsName, ingredientsAmount, ingredientsUnit} = req.body;
+        const {userId, nickname, title, descriptionJSON, targetPetType, foodCategory, cookingTimeLimit, level, caloriesPerServing, favoritesCount, carbs, protein, fat, calcium, phosphorus, moisture, fiber, nacl, ptss, mainChange, descriptionChangeJSON, ingredientsNameJSON, ingredientsAmountJSON, ingredientsUnitJSON} = req.body;
 
         const [existing] = await conn.query("SELECT ID, FLOW, IMAGE_URL FROM DESCRIPTION WHERE RECIPE_ID=?", [recipeId]);
+
+        const description = JSON.parse(descriptionJSON || '[]')
+        const ingredientsName = JSON.parse(ingredientsNameJSON || '[]'), ingredientsAmount = JSON.parse(ingredientsAmountJSON || '[]'), ingredientsUnit = JSON.parse(ingredientsUnitJSON || '[]')
+        const descriptionChange = JSON.parse(descriptionChangeJSON || '[]')
 
         const toDelete = existing.filter(img => img.IMAGE_URL === null ? false : !keepUrls.includes(img.IMAGE_URL));
 
         for(let img of toDelete){
             if(img.IMAGE_URL === null) continue;
             const relativePath = img.IMAGE_URL.split("/uploads/")[1];
-            const filePath = path.join(UPLOAD_PATH, 'uploads', relativePath);
+            const filePath = path.join(UPLOAD_PATH, relativePath);
 
-            fs.unlink(filePath, err => {
-                if(err) logger.error("delete file error", err);
-            });
+            try {
+                await fs.promises.unlink(filePath);
+            } catch (error) {
+                logger.error(error);
+                await conn.rollback();
+                conn.release();
+                return res.status(500).json({ error: "파일 삭제에 실패했습니다." });
+            }
         }
 
         if(toDelete.length > 0){
@@ -760,11 +785,11 @@ app.post("/updateRecipe", upload.array("newImages", 10), async (req, res) => {
             }
         }
 
-        const update = mainChange ? [userId, title, mainImage, targetPetType, foodCategory, cookingTimeLimit, level, caloriesPerServing, favoritesCount, carbs, protein, fat, calcium, phosphorus, moisture, fiber, recipeId]
-                                : [userId, title, targetPetType, foodCategory, cookingTimeLimit, level, caloriesPerServing, favoritesCount, carbs, protein, fat, calcium, phosphorus, moisture, fiber, recipeId]
+        const update = mainChange ? [userId, nickname, title, mainImage, targetPetType, foodCategory, cookingTimeLimit, level, caloriesPerServing, favoritesCount, carbs, protein, fat, calcium, phosphorus, moisture, fiber, nacl, ptss, recipeId]
+                                : [userId, nickname, title, targetPetType, foodCategory, cookingTimeLimit, level, caloriesPerServing, favoritesCount, carbs, protein, fat, calcium, phosphorus, moisture, fiber, nacl, ptss, recipeId]
 
         await conn.query(
-            `UPDATE RECIPES SET USER_ID=?, TITLE=?, ${ mainChange ? "MAIN_IMAGE_URL=?," : ""} TARGET_PET_TYPE=?, FOOD_CATEGORY=?, COOKING_TIME_LIMIT=?, LEVEL=?, CALORIES_PER_SERVING=?, FAVORITES_COUNT=?, NUTRITIONAL_INFO_CARBS_G=?, NUTRITIONAL_INFO_PROTEIN_G=?, NUTRITIONAL_INFO_FAT_G=?, NUTRITIONAL_INFO_CALCIUM_G=?, NUTRITIONAL_INFO_PHOSPHORUS_G=?, NUTRITIONAL_INFO_MOISTURE_PERCENT=?, NUTRITIONAL_INFO_FIBER_G=? WHERE ID=?`
+            `UPDATE RECIPES SET USER_ID=?, NICKNAME=?, TITLE=?, ${ mainChange ? "MAIN_IMAGE_URL=?," : ""} TARGET_PET_TYPE=?, FOOD_CATEGORY=?, COOKING_TIME_LIMIT=?, LEVEL=?, CALORIES_PER_SERVING=?, FAVORITES_COUNT=?, NUTRITIONAL_INFO_CARBS_G=?, NUTRITIONAL_INFO_PROTEIN_G=?, NUTRITIONAL_INFO_FAT_G=?, NUTRITIONAL_INFO_CALCIUM_G=?, NUTRITIONAL_INFO_PHOSPHORUS_G=?, NUTRITIONAL_INFO_MOISTURE_PERCENT=?, NUTRITIONAL_INFO_FIBER_G=?, NUTRITIONAL_INFO_NACL_G=?, NUTRITIONAL_INFO_PTSS_G=? WHERE ID=?`
             , update
         );
 
@@ -796,12 +821,19 @@ app.get("/removeRecipe/:id", async (req, res) => {
         const { id } = req.params;
         const [images] = await conn.query("SELECT ID, IMAGE_URL FROM DESCRIPTION WHERE RECIPE_ID=?", [id]);
 
-        for(let img of images){
-            if(img.IMAGE_URL === null) continue;
-            const relativePath = img.IMAGE_URL.split("/uploads/")[1];
-            const filePath = path.join(UPLOAD_PATH, 'uploads', relativePath);
+        for (const img of images) {
+            if (!img.IMAGE_URL) continue;
+            const relativePath = img.IMAGE_URL.split('/uploads/')[1];
+            const filePath = path.join(UPLOAD_PATH, relativePath);
 
-            if(fs.existsSync(filePath)) fs.unlinkSync(filePath);
+            try {
+                await fs.promises.unlink(filePath);
+            } catch (error) {
+                logger.error(error);
+                await conn.rollback();
+                conn.release();
+                return res.status(500).json({ error: "레시피 관련 파일 삭제에 실패했습니다." });
+            }
         }
 
         await conn.query("DELETE FROM DESCRIPTION WHERE RECIPE_ID=?", [id]);
@@ -863,7 +895,24 @@ app.post("/searchRecipe", async (req, res) => {
         const check = [];
         if(pet) check.push(pet);
         if(food) check.push(food);
-        const [rows] = await db.query(`SELECT * FROM RECIPES WHERE 1=1 ${title ? `AND TITLE LIKE '%${title}%'` : ""} ${pet ? ` AND TARGET_PET_TYPE=? ` : ""} ${food ? ` AND FOOD_CATEGORY IN (?)` : ""}`, check);
+
+        let sql = 'SELECT * FROM RECIPES WHERE 1=1';
+        const params = [];
+
+        if (title) {
+            sql += ' AND TITLE LIKE ?';
+            params.push(`%${title}%`);
+        }
+        if (pet) {
+            sql += ' AND TARGET_PET_TYPE = ?';
+            params.push(pet);
+        }
+        if (food && food.length > 0) {
+            sql += ' AND FOOD_CATEGORY IN (?)';
+            params.push(food);
+        }
+
+        const [rows] = await db.query(sql, params);
 
         logger.info("레시피 상세 찾기");
         return res.status(200).json({recipe : rows});
@@ -1013,7 +1062,7 @@ app.get("/getFavorites/:userId", async (req, res) => {
 
         const recipeIds = favorites.map(e => e.RECIPE_ID);
 
-        const [recipes] = favorites.length > 0 ? await db.query(
+        const [recipes] = recipeIds.length > 0 ? await db.query(
             "SELECT ID, USER_ID, TITLE, MAIN_IMAGE_URL, VIEW_COUNT FROM RECIPES WHERE ID IN (?)",
             [recipeIds]
         ) : null;
@@ -1076,11 +1125,11 @@ app.get("/getRecentlyView/:userId", async (req, res) => {
     try {
         const { userId } = req.params;
 
-        const [recentlyView] = await db.query("SELECT DISTINCT USER_ID, RECIPE_ID FROM RECENTLY_VIEWED_RECIPES WHERE USER_ID=31 ORDER BY ID DESC LIMIT 5", [userId]);
+        const [recentlyView] = await db.query("SELECT DISTINCT USER_ID, RECIPE_ID FROM RECENTLY_VIEWED_RECIPES WHERE USER_ID=? ORDER BY ID DESC LIMIT 5", [userId]);
 
         const recipeIds = recentlyView.map(e => e.RECIPE_ID);
 
-        const [recipes] = await db.query("SELECT ID, USER_ID, TITLE, MAIN_IMAGE_URL, VIEW_COUNT FROM RECIPES WHERE ID IN (?) ORDER BY FIND_IN_SET(ID, ?)", [ recipeIds, recipeIds.join(',') ]);
+        const [recipes] = recipeIds.length > 0 ? await db.query("SELECT ID, USER_ID, TITLE, MAIN_IMAGE_URL, VIEW_COUNT FROM RECIPES WHERE ID IN (?) ORDER BY FIND_IN_SET(ID, ?)", [ recipeIds, recipeIds.join(',') ]) : null;
 
         logger.info(`${userId}님의 최근 본 레시피를 불러옵니다.`);
         return res.status(200).json({recentlyView, recipes});
@@ -1105,25 +1154,42 @@ app.get("/getPopularity", async (req, res) => {
 
 https.createServer(options, app).listen(3333, () => logger.info("서버가 연결되었습니다."));
 
-function authenticateToken(req, res, next) {
+async function authenticateToken(req, res, next) {
     const token = req.cookies.token;
 
-    if(!token) return res.status(404).json({ message : "토큰이 없습니다."});
+    if(!token) {
+        logger.error("토큰이 없습니다.");
+        return res.status(404).json({ message : "토큰이 없습니다."});
+    }
 
-    return jwt.verify(token, jwtSecret, async (err, user) => {
-        if(err) return res.status(401).json({ message : "유효하지 않은 토큰입니다."});
+    let user;
 
-        const [nowToken] = await db.query("SELECT * FROM TOKEN_USER WHERE EMAIL=? AND TOKEN=?", [user.email, token]);
+    try {
+        user = jwt.verify(token, jwtSecret);
+    } catch (error) {
+        logger.error("유효하지 않은 토큰, ", error);
+        return res.status(401).json({ message : "유효하지 않은 토큰입니다."});
+    }
 
-        if(nowToken.length === 0) {
+    try {
+        const [nowToken] = await db.query(
+            "SELECT * FROM TOKEN_USER WHERE EMAIL=? AND TOKEN=?",
+            [user.email, token]
+        );
+        if (nowToken.length === 0) {
             res.clearCookie('token');
-            logger.info(`중복 로그인 제거`);
-            return res.status(401).json({message : "다른 곳에서 로그인을 시도했습니다.\n안전을 위해 로그아웃되었습니다."});
+            logger.error("중복 로그인 제거");
+            return res.status(401).json({
+                message: "다른 곳에서 로그인을 시도했습니다.\n안전을 위해 로그아웃되었습니다."
+            });
         }
-
         req.user = user;
-        return next();
-    })
+        next();
+    } catch (err) {
+        res.clearCookie('token');
+        logger.error(err);
+        return res.status(500).json({ error: "토큰 검증 중 서버 오류가 발생했습니다." });
+    }
 }
 
 function effectiveness(email, nickname, password){
