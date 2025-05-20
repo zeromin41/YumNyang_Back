@@ -55,7 +55,7 @@ Express.js와 MariaDB 기반으로 JWT 인증, 이미지 업로드, 외부 XML A
    npm install
    ```
 3. 환경 변수 설정  
-   프로젝트 루트에 `.env` 파일을 생성하고 다음 값을 입력합니다:
+   프로젝트 루트에 `.env` 파일을 생성하고 다음 값을 입력합니다: ( 실제 서버에 입력된 값과 다릅니다. )
    ```dotenv
    PORT=3333
    DB_HOST=your_db_host
