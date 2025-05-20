@@ -310,7 +310,7 @@ JWT 인증이 필요한 요청은 `Cookie: token=<JWT>` 헤더를 포함하세�
   </details>
 
 <details>
-<summary><code>PUT /updatePetInfo</code></summary>
+<summary><code>POST /updatePetInfo</code></summary>
 
 - 설명: 반려동물 정보 수정
 - Request Body:
@@ -338,7 +338,7 @@ JWT 인증이 필요한 요청은 `Cookie: token=<JWT>` 헤더를 포함하세�
   </details>
 
 <details>
-<summary><code>DELETE /removePetInfo/:id</code></summary>
+<summary><code>POST /removePetInfo/:id</code></summary>
 
 - 설명: 반려동물 삭제
 - Responses:
@@ -376,85 +376,84 @@ JWT 인증이 필요한 요청은 `Cookie: token=<JWT>` 헤더를 포함하세�
 ### 레시피 (Recipe)
 
 <details>
-<summary><code>POST /recipes</code></summary>
-
+<summary><code>POST /AddRecipe</code></summary>
 - 설명: 레시피 추가 (이미지 최대 10장)
-- Content-Type: `multipart/form-data`
+- Content-Type: multipart/form-data
 - Form Data:
-  - `images[]`: 파일 최대 10개
-  - `userId, title, targetPetType, foodCategory, cookingTimeLimit, level, caloriesPerServing, favoritesCount, carbs, protein, fat, calcium, phosphorus, moisture, fiber, nacl, ptss`
-  - `descriptionJSON` (단계별 설명 배열 JSON)
-  - `ingredientsJSON` (원료명, 수량, 단위 배열 JSON)
+  - `images`: 파일 최대 10개
+  - `userId`, `nickname`, `title`, `descriptionJSON`, `targetPetType`, `foodCategory`, `cookingTimeLimit`, `level`, `caloriesPerServing`, `favoritesCount`, `carbs`, `protein`, `fat`, `calcium`, `phosphorus`, `moisture`, `fiber`, `nacl`, `ptss`
+  - `ingredientsNameJSON`, `ingredientsAmountJSON`, `ingredientsUnitJSON`
 - Responses:
-  - `201 Created` `{ "message": "레시피가 등록되었습니다." }`
+  - `200 OK` `{ "message": "레시피 추가가 완료되었습니다." }`
   - `500 Internal Server Error`
-  </details>
+</details>
 
 <details>
-<summary><code>PUT /recipes/:id</code></summary>
-
+<summary><code>POST /updateRecipe</code></summary>
 - 설명: 레시피 수정 (이미지 보관 및 교체)
-- Content-Type: `multipart/form-data`
+- Content-Type: multipart/form-data
 - Form Data:
-  - `keepUrls[]` (유지할 기존 이미지 URL)
-  - `newImages[]` (새 이미지 파일 최대 10개)
-  - 그 외 레시피 필드 및 `descriptionJSON`, `ingredientsJSON`
+  - `recipeId`, `keepUrls`, `newImages`
+  - `userId`, `nickname`, `title`, `descriptionJSON`, `targetPetType`, `foodCategory`, `cookingTimeLimit`, `level`, `caloriesPerServing`, `favoritesCount`, `carbs`, `protein`, `fat`, `calcium`, `phosphorus`, `moisture`, `fiber`, `nacl`, `ptss`
+  - `mainChange`, `descriptionChangeJSON`
+  - `ingredientsNameJSON`, `ingredientsAmountJSON`, `ingredientsUnitJSON`
 - Responses:
   - `200 OK` `{ "message": "레시피가 수정되었습니다." }`
   - `500 Internal Server Error`
-  </details>
+</details>
 
 <details>
-<summary><code>GET /recipes/:id</code></summary>
+<summary><code>GET /removeRecipe/:id</code></summary>
+- 설명: 레시피 삭제 (이미지 파일 포함)
+- Responses:
+  - `200 OK` `{ "message": "레시피가 삭제되었습니다." }`
+  - `500 Internal Server Error`
+</details>
 
+<details>
+<summary><code>GET /getRecipe/:id</code></summary>
 - 설명: 레시피 상세 조회 (조회수 증가)
 - Responses:
   - `200 OK`
     ```json
     {
-      "recipe": {
-        /* RECIPES */
-      },
-      "description": [
-        /* DESCRIPTION */
-      ],
-      "ingredients": [
-        /* INGREDIENTS */
-      ]
+      "recipe": { /* RECIPES */ },
+      "description": [ /* DESCRIPTION */ ],
+      "ingredient": [ /* INGREDIENTS */ ]
     }
     ```
-  - `404 Not Found` `{ "message": "레시피를 찾을 수 없습니다." }`
+  - `404 Not Found` `{ "message": "레시피가 존재하지않습니다." }`
   - `500 Internal Server Error`
-  </details>
+</details>
 
 <details>
-<summary><code>DELETE /recipes/:id</code></summary>
-
-- 설명: 레시피 삭제 (이미지 파일 포함)
-- Responses:
-  - `200 OK` `{ "message": "레시피가 삭제되었습니다." }`
-  - `500 Internal Server Error`
-  </details>
-
-<details>
-<summary><code>GET /recipes</code></summary>
-
+<summary><code>POST /searchRecipe</code></summary>
 - 설명: 레시피 검색 (제목, 반려동물, 분류)
-- Query Parameters:
-  - `title`, `pet`, `food` (선택)
+- Content-Type: application/json
+- Request Body:
+  ```json
+  { "title": "검색어", "pet": "dog", "food": ["402001"] }
+  ```
 - Responses:
-  - `200 OK` `{ "recipes": [ /* 배열 */ ] }`
+  - `200 OK` `{ "recipe": [ /* 배열 */ ] }`
   - `500 Internal Server Error`
-  </details>
+</details>
 
 <details>
-<summary><code>GET /users/:userId/recipes</code></summary>
-
+<summary><code>GET /getMyRecipe/:userId</code></summary>
 - 설명: 사용자별 레시피 목록 조회
 - Responses:
-  - `200 OK` `{ "recipes": [ { "id", "mainImageUrl", "title" }, ... ] }`
+  - `200 OK` `{ "recipe": [ { "ID", "MAIN_IMAGE_URL", "TITLE", "VIEW_COUNT" }, ... ] }`
   - `404 Not Found` `{ "message": "레시피가 없습니다." }`
   - `500 Internal Server Error`
-  </details>
+</details>
+
+<details>
+<summary><code>GET /getPopularity</code></summary>
+- 설명: 인기있는 5개의 레시피 조회
+- Responses:
+  - `200 OK` `{ "popularity": [ { "ID", "USER_ID", "TITLE", "MAIN_IMAGE_URL", "VIEW_COUNT" }, ... ] }`
+  - `500 Internal Server Error`
+</details>
 
 ---
