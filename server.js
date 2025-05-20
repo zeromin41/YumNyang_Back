@@ -896,7 +896,7 @@ app.post("/searchRecipe", async (req, res) => {
         if(pet) check.push(pet);
         if(food) check.push(food);
 
-        let sql = 'SELECT * FROM RECIPES WHERE 1=1';
+        let sql = 'SELECT ID, USER_ID, NICKNAME, TITLE, MAIN_IMAGE_URL, VIEW_COUNT FROM RECIPES WHERE 1=1';
         const params = [];
 
         if (title) {
@@ -926,7 +926,7 @@ app.get("/getMyRecipe/:userId", async (req, res) => {
     try {
         const { userId } = req.params;
 
-        const [rows] = await db.query("SELECT ID, MAIN_IMAGE_URL, TITLE, VIEW_COUNT FROM RECIPES WHERE USER_ID=?", [userId]);
+        const [rows] = await db.query("SELECT ID, USER_ID, NICKNAME, TITLE, MAIN_IMAGE_URL, VIEW_COUNT FROM RECIPES WHERE USER_ID=?", [userId]);
 
         if(rows.length === 0){
             logger.error("레시피가 없습니다.");
@@ -1010,6 +1010,7 @@ app.post("/upDateReview", async (req, res) => {
     }
 });
 
+// 나의 리뷰 찾기
 app.get("/getMyReview/:userId", async (req, res) => {
     const { userId } = req.params;
 
@@ -1063,9 +1064,9 @@ app.get("/getFavorites/:userId", async (req, res) => {
         const recipeIds = favorites.map(e => e.RECIPE_ID);
 
         const [recipes] = recipeIds.length > 0 ? await db.query(
-            "SELECT ID, USER_ID, TITLE, MAIN_IMAGE_URL, VIEW_COUNT FROM RECIPES WHERE ID IN (?)",
+            "SELECT ID, USER_ID, NICKNAME, TITLE, MAIN_IMAGE_URL, VIEW_COUNT FROM RECIPES WHERE ID IN (?)",
             [recipeIds]
-        ) : null;
+        ) : [];
 
         logger.info(`${userId}님의 즐겨찾기를 찾았습니다.`);
         return res.status(200).json({ favorites, recipes});
@@ -1129,7 +1130,7 @@ app.get("/getRecentlyView/:userId", async (req, res) => {
 
         const recipeIds = recentlyView.map(e => e.RECIPE_ID);
 
-        const [recipes] = recipeIds.length > 0 ? await db.query("SELECT ID, USER_ID, TITLE, MAIN_IMAGE_URL, VIEW_COUNT FROM RECIPES WHERE ID IN (?) ORDER BY FIND_IN_SET(ID, ?)", [ recipeIds, recipeIds.join(',') ]) : null;
+        const [recipes] = recipeIds.length > 0 ? await db.query("SELECT ID, USER_ID, NICKNAME, TITLE, MAIN_IMAGE_URL, VIEW_COUNT FROM RECIPES WHERE ID IN (?) ORDER BY FIND_IN_SET(ID, ?)", [ recipeIds, recipeIds.join(',') ]) : [];
 
         logger.info(`${userId}님의 최근 본 레시피를 불러옵니다.`);
         return res.status(200).json({recentlyView, recipes});
@@ -1142,7 +1143,7 @@ app.get("/getRecentlyView/:userId", async (req, res) => {
 // 인기있는 5개의 레시피 보여주기
 app.get("/getPopularity", async (req, res) => {
     try {
-        const [rows] = await db.query("SELECT ID, USER_ID, TITLE, MAIN_IMAGE_URL, VIEW_COUNT FROM RECIPES ORDER BY VIEW_COUNT DESC LIMIT 5");
+        const [rows] = await db.query("SELECT ID, USER_ID, NICKNAME, TITLE, MAIN_IMAGE_URL, VIEW_COUNT FROM RECIPES ORDER BY VIEW_COUNT DESC LIMIT 5");
 
         logger.info("인기있는 레시피 5개를 추출합니다.");
         return res.status(200).json({popularity : rows});

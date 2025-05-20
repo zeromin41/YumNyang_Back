@@ -2,14 +2,19 @@
 
 먹었냥 프로젝트 백엔드
 
+[<img src="https://img.shields.io/badge/프로젝트 기간-2025.05.08~2025.05.20-fab2ac?style=flat&logo=&logoColor=white" />]()
+
 ## 🚀 목차
 
 1. [프로젝트 소개](#프로젝트-소개)
-2. [기술 스택](#기술-스택)
-3. [설치 및 실행](#설치-및-실행)
-4. [환경 변수](#환경-변수)
-5. [로깅](#로깅)
-6. [API 엔드포인트](#api-엔드포인트)
+2. [프로젝트 팀원](#️-프로젝트-팀원)
+3. [배포](#배포)
+4. [프론트엔드 URL](#프론트엔드-url)
+5. [기술 스택](#기술-스택)
+6. [설치 및 실행](#설치-및-실행)
+7. [환경 변수](#환경-변수)
+8. [로깅](#로깅)
+9. [API 엔드포인트](#api-엔드포인트)
    - [인증 (Authentication)](#인증-authentication)
    - [회원 (User)](#회원-user)
    - [반려동물 (Pet)](#반려동물-pet)
@@ -26,6 +31,70 @@
 
 `YumNyang_Back`은 반려동물을 위한 집밥 레시피 공유 플랫폼 '먹었냥'의 백엔드 서버입니다.  
 Express.js와 MariaDB 기반으로 JWT 인증, 이미지 업로드, 외부 XML API 연동 기능을 제공합니다.
+
+---
+
+## 💁‍♂️ 프로젝트 팀원
+
+<table>
+<tr>
+<td width="25%" align="center"><strong>김소은</strong></td>
+<td width="25%" align="center"><strong>심영민</strong></td>
+<td width="25%" align="center"><strong>이승우</strong></td>
+<td width="25%" align="center"><strong>홍성현</strong></td>
+</tr>
+<tr>
+<td width="25%" align="center">
+<img src="https://github.com/user-attachments/assets/78bd7518-2c13-4134-9b98-39b5cdbd68d3" width="100px" alt="김소은"/>
+</td>
+<td width="25%" align="center">
+<img src="https://github.com/user-attachments/assets/3a8bbdce-807c-4c5e-a228-fa678184ed1d" width="100px" alt="심영민"/>
+</td>
+<td width="25%" align="center">
+<img src="https://avatars.githubusercontent.com/u/51819005?v=4" width="100px" alt="이승우"/>
+</td>
+<td width="25%" align="center">
+<img src="https://github.com/user-attachments/assets/fde48b01-60f6-41eb-a09b-4e3fcb32d56e" width="100px" alt="홍성현"/>
+</td>
+</tr>
+<tr>
+<td width="25%" align="center">
+<a href="https://github.com/nue-os">GitHub</a>
+</td>
+<td width="25%" align="center">
+<a href="https://github.com/zeromin41">GitHub</a>
+</td>
+<td width="25%" align="center">
+<a href="https://github.com/seungwoo505">GitHub</a>
+</td>
+<td width="25%" align="center">
+<a href="https://github.com/Lacheln1">GitHub</a>
+</td>
+</tr>
+<tr>
+<td width="25%" align="center">
+프론트엔드
+</td>
+<td width="25%" align="center">
+프론트엔드
+</td>
+<td width="25%" align="center">
+프론트엔드 </br> 백엔드
+</td>
+<td width="25%" align="center">
+프론트엔드
+</td>
+</tr>
+</table>
+</br>
+
+## 배포
+
+[먹었냥🐾](https://seungwoo.i234.me/#/)
+
+## 프론트엔드 URL
+
+[프론트엔드 URL 링크](https://github.com/zeromin41/YumNyang)
 
 ---
 
@@ -55,7 +124,7 @@ Express.js와 MariaDB 기반으로 JWT 인증, 이미지 업로드, 외부 XML A
    npm install
    ```
 3. 환경 변수 설정  
-   프로젝트 루트에 `.env` 파일을 생성하고 다음 값을 입력합니다:
+   프로젝트 루트에 `.env` 파일을 생성하고 다음 값을 입력합니다: ( 실제 서버에 입력된 값과 다릅니다. )
    ```dotenv
    PORT=3333
    DB_HOST=your_db_host
@@ -72,6 +141,8 @@ Express.js와 MariaDB 기반으로 JWT 인증, 이미지 업로드, 외부 XML A
    HTTPS_CERT=/absolute/path/to/your.crt
    HTTPS_CA=/absolute/path/to/ca_bundle.crt
    ANIMAL_FOOD_API=your_nongsaro_api_key
+   LOCALHOST=http://localhost:5173
+   MY_HOST=https://seungwoo.i234.me
    ```
 4. 서버 실행
    ```bash
@@ -86,23 +157,25 @@ Express.js와 MariaDB 기반으로 JWT 인증, 이미지 업로드, 외부 XML A
 
 ## 환경 변수
 
-| 변수명            | 설명                            | 예시                           |
-| ----------------- | ------------------------------- | ------------------------------ |
-| `PORT`            | 서버 포트                       | `3333`                         |
-| `DB_HOST`         | MariaDB 호스트                  | `localhost`                    |
-| `DB_PORT`         | MariaDB 포트                    | `3306`                         |
-| `DB_USER`         | MariaDB 사용자                  | `root`                         |
-| `DB_PASSWORD`     | MariaDB 비밀번호                | `password123`                  |
-| `DB_SCHEMA`       | 데이터베이스 스키마             | `yumnyang`                     |
-| `JWT_SECRET`      | JWT 서명 비밀키                 | `supersecretkey`               |
-| `TIME_COST`       | Argon2 시간 비용                | `3`                            |
-| `MEMORY_COST`     | Argon2 메모리 비용 (2^n MiB)    | `12`                           |
-| `PARALLELISM`     | Argon2 병렬 처리 개수           | `1`                            |
-| `UPLOAD_PATH`     | 파일 업로드 경로                | `/var/www/yumnyang/uploads`    |
-| `HTTPS_KEY`       | HTTPS 개인키 파일 경로          | `/etc/ssl/private/key.pem`     |
-| `HTTPS_CERT`      | HTTPS 인증서 파일 경로          | `/etc/ssl/certs/cert.pem`      |
-| `HTTPS_CA`        | HTTPS CA 번들 파일 경로         | `/etc/ssl/certs/ca_bundle.pem` |
-| `ANIMAL_FOOD_API` | 농림축산검역본부(농사로) API 키 | `ABCDEFGHIJKL`                 |
+| 변수명            | 설명                                   | 예시                           |
+| ----------------- | -------------------------------------- | ------------------------------ |
+| `PORT`            | 서버 포트                              | `3333`                         |
+| `DB_HOST`         | MariaDB 호스트                         | `localhost`                    |
+| `DB_PORT`         | MariaDB 포트                           | `3306`                         |
+| `DB_USER`         | MariaDB 사용자                         | `root`                         |
+| `DB_PASSWORD`     | MariaDB 비밀번호                       | `password123`                  |
+| `DB_SCHEMA`       | 데이터베이스 스키마                    | `yumnyang`                     |
+| `JWT_SECRET`      | JWT 서명 비밀키                        | `supersecretkey`               |
+| `TIME_COST`       | Argon2 시간 비용                       | `3`                            |
+| `MEMORY_COST`     | Argon2 메모리 비용 (2^n MiB)           | `12`                           |
+| `PARALLELISM`     | Argon2 병렬 처리 개수                  | `1`                            |
+| `UPLOAD_PATH`     | 파일 업로드 경로                       | `/var/www/yumnyang/uploads`    |
+| `HTTPS_KEY`       | HTTPS 개인키 파일 경로                 | `/etc/ssl/private/key.pem`     |
+| `HTTPS_CERT`      | HTTPS 인증서 파일 경로                 | `/etc/ssl/certs/cert.pem`      |
+| `HTTPS_CA`        | HTTPS CA 번들 파일 경로                | `/etc/ssl/certs/ca_bundle.pem` |
+| `ANIMAL_FOOD_API` | 농림축산검역본부(농사로) API 키        | `ABCDEFGHIJKL`                 |
+| `LOCALHOST`       | 허용할 로컬호스트 도메인 (CORS origin) | `http://localhost:5173`        |
+| `MY_HOST`         | 허용할 프로덕션 도메인 (CORS origin)   | `https://seungwoo.i234.me`     |
 
 ---
 
@@ -473,5 +546,131 @@ JWT 인증이 필요한 요청은 `Cookie: token=<JWT>` 헤더를 포함하세�
   - `500 Internal Server Error`
 
 </details>
+
+### 리뷰 (Review)
+
+<details>
+<summary><code>POST /addReview</code></summary>
+
+- 설명: 리뷰 추가
+- Content-Type: `application/json`
+- Request Body:
+  ```json
+  {
+    "recipeId": 1,
+    "userId": 1,
+    "nickname": "뽀삐",
+    "ratingScore": 5,
+    "commentText": "맛있어요!"
+  }
+  ```
+- Responses:
+  - `200 OK` `{ "message": "리뷰가 정상적으로 등록되었습니다." }`
+  - `500 Internal Server Error`
+  </details>
+
+<details>
+<summary><code>GET /getReview/:recipeId</code></summary>
+
+- 설명: 특정 레시피 리뷰 조회
+- Responses:
+  - `200 OK` `{ "review": [ /* 배열 */ ] }`
+  - `404 Not Found` `{ "error": "리뷰가 없습니다." }`
+  - `500 Internal Server Error`
+  </details>
+
+<details>
+<summary><code>POST /upDateReview</code></summary>
+
+- 설명: 리뷰 업데이트 또는 삭제
+- Content-Type: `application/json`
+- Request Body:
+  ```json
+  {
+    "id": 1,
+    "type": "update", // or "delete"
+    "ratingScore": 4,
+    "commentText": "수정된 댓글"
+  }
+  ```
+- Responses:
+  - `200 OK` `{ "message": "업데이트 성공" }` or `{ "message": "삭제 성공" }`
+  - `500 Internal Server Error`
+  </details>
+
+<details>
+<summary><code>GET /getMyReview/:userId</code></summary>
+
+- 설명: 사용자별 리뷰 조회
+- Responses:
+  - `200 OK` `{ "reviews": [ /* 배열 */ ] }`
+  - `404 Not Found` `{ "message": "리뷰가 없습니다." }`
+  - `500 Internal Server Error`
+  </details>
+
+### 즐겨찾기 (Favorites)
+
+<details>
+<summary><code>POST /addFavorites</code></summary>
+
+- 설명: 즐겨찾기 추가
+- Content-Type: `application/json`
+- Request Body:
+  ```json
+  {
+    "userId": 1,
+    "recipeId": 1
+  }
+  ```
+- Responses:
+  - `200 OK` `{ "message": "즐겨찾기 추가" }`
+  - `500 Internal Server Error`
+  </details>
+
+<details>
+<summary><code>GET /getFavorites/:userId</code></summary>
+
+- 설명: 사용자 즐겨찾기 조회
+- Responses:
+  - `200 OK` `{ "favorites": [ /* 배열 */ ], "recipes": [ /* 배열 */ ] }`
+  - `500 Internal Server Error`
+  </details>
+
+<details>
+<summary><code>GET /removeFavorites/:id</code></summary>
+
+- 설명: 즐겨찾기 삭제
+- Responses:
+  - `200 OK` `{ "message": "즐겨찾기 삭제" }`
+  - `500 Internal Server Error`
+  </details>
+
+### 최근 본 레시피 (Recently Viewed)
+
+<details>
+<summary><code>POST /addRecentlyView</code></summary>
+
+- 설명: 최근 본 레시피 추가
+- Content-Type: `application/json`
+- Request Body:
+  ```json
+  {
+    "userId": 1,
+    "recipeId": 1
+  }
+  ```
+- Responses:
+  - `200 OK` `{ "message": "최근 본 레시피 추가 완료" }`
+  - `500 Internal Server Error`
+  </details>
+
+<details>
+<summary><code>GET /getRecentlyView/:userId</code></summary>
+
+- 설명: 최근 본 레시피 조회 (최근 5개)
+- Responses:
+  - `200 OK` `{ "recentlyView": [ /* 배열 */ ], "recipes": [ /* 배열 */ ] }`
+  - `500 Internal Server Error`
+  </details>
 
 ---
