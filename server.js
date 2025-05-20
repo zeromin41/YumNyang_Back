@@ -1066,7 +1066,7 @@ app.get("/getFavorites/:userId", async (req, res) => {
         const [recipes] = recipeIds.length > 0 ? await db.query(
             "SELECT ID, USER_ID, NICKNAME, TITLE, MAIN_IMAGE_URL, VIEW_COUNT FROM RECIPES WHERE ID IN (?)",
             [recipeIds]
-        ) : null;
+        ) : [];
 
         logger.info(`${userId}님의 즐겨찾기를 찾았습니다.`);
         return res.status(200).json({ favorites, recipes});
@@ -1130,7 +1130,7 @@ app.get("/getRecentlyView/:userId", async (req, res) => {
 
         const recipeIds = recentlyView.map(e => e.RECIPE_ID);
 
-        const [recipes] = recipeIds.length > 0 ? await db.query("SELECT ID, USER_ID, NICKNAME, TITLE, MAIN_IMAGE_URL, VIEW_COUNT FROM RECIPES WHERE ID IN (?) ORDER BY FIND_IN_SET(ID, ?)", [ recipeIds, recipeIds.join(',') ]) : null;
+        const [recipes] = recipeIds.length > 0 ? await db.query("SELECT ID, USER_ID, NICKNAME, TITLE, MAIN_IMAGE_URL, VIEW_COUNT FROM RECIPES WHERE ID IN (?) ORDER BY FIND_IN_SET(ID, ?)", [ recipeIds, recipeIds.join(',') ]) : [];
 
         logger.info(`${userId}님의 최근 본 레시피를 불러옵니다.`);
         return res.status(200).json({recentlyView, recipes});
