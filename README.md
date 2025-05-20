@@ -2,14 +2,19 @@
 
 먹었냥 프로젝트 백엔드
 
+[<img src="https://img.shields.io/badge/프로젝트 기간-2025.05.08~2025.05.20-fab2ac?style=flat&logo=&logoColor=white" />]()
+
 ## 🚀 목차
 
 1. [프로젝트 소개](#프로젝트-소개)
-2. [기술 스택](#기술-스택)
-3. [설치 및 실행](#설치-및-실행)
-4. [환경 변수](#환경-변수)
-5. [로깅](#로깅)
-6. [API 엔드포인트](#api-엔드포인트)
+2. [프로젝트 팀원](#️-프로젝트-팀원)
+3. [배포](#배포)
+4. [프론트엔드 URL](#프론트엔드-url)
+5. [기술 스택](#기술-스택)
+6. [설치 및 실행](#설치-및-실행)
+7. [환경 변수](#환경-변수)
+8. [로깅](#로깅)
+9. [API 엔드포인트](#api-엔드포인트)
    - [인증 (Authentication)](#인증-authentication)
    - [회원 (User)](#회원-user)
    - [반려동물 (Pet)](#반려동물-pet)
@@ -28,6 +33,70 @@
 Express.js와 MariaDB 기반으로 JWT 인증, 이미지 업로드, 외부 XML API 연동 기능을 제공합니다.
 
 ---
+
+## 💁‍♂️ 프로젝트 팀원
+
+<table>
+<tr>
+<td width="25%" align="center"><strong>김소은</strong></td>
+<td width="25%" align="center"><strong>심영민</strong></td>
+<td width="25%" align="center"><strong>이승우</strong></td>
+<td width="25%" align="center"><strong>홍성현</strong></td>
+</tr>
+<tr>
+<td width="25%" align="center">
+<img src="https://github.com/user-attachments/assets/78bd7518-2c13-4134-9b98-39b5cdbd68d3" width="100px" alt="김소은"/>
+</td>
+<td width="25%" align="center">
+<img src="https://github.com/user-attachments/assets/3a8bbdce-807c-4c5e-a228-fa678184ed1d" width="100px" alt="심영민"/>
+</td>
+<td width="25%" align="center">
+<img src="https://avatars.githubusercontent.com/u/51819005?v=4" width="100px" alt="이승우"/>
+</td>
+<td width="25%" align="center">
+<img src="https://github.com/user-attachments/assets/fde48b01-60f6-41eb-a09b-4e3fcb32d56e" width="100px" alt="홍성현"/>
+</td>
+</tr>
+<tr>
+<td width="25%" align="center">
+<a href="https://github.com/nue-os">GitHub</a>
+</td>
+<td width="25%" align="center">
+<a href="https://github.com/zeromin41">GitHub</a>
+</td>
+<td width="25%" align="center">
+<a href="https://github.com/seungwoo505">GitHub</a>
+</td>
+<td width="25%" align="center">
+<a href="https://github.com/Lacheln1">GitHub</a>
+</td>
+</tr>
+<tr>
+<td width="25%" align="center">
+프론트엔드
+</td>
+<td width="25%" align="center">
+프론트엔드
+</td>
+<td width="25%" align="center">
+프론트엔드 </br> 백엔드
+</td>
+<td width="25%" align="center">
+프론트엔드
+</td>
+</tr>
+</table>
+</br>
+
+## 배포
+
+[먹었냥🐾](https://seungwoo.i234.me/#/)
+
+## 프론트엔드 URL
+
+[프론트엔드 URL 링크](https://github.com/zeromin41/YumNyang)
+
+--
 
 ## 기술 스택
 
