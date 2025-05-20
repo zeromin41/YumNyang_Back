@@ -19,8 +19,6 @@
    - [즐겨찾기 (Favorites)](#즐겨찾기-favorites)
    - [최근 본 레시피 (Recently Viewed)](#최근-본-레시피-recently-viewed)
    - [인기 레시피 (Popularity)](#인기-레시피-popularity)
-7. [에러 처리](#에러-처리)
-8. [라이선스](#라이선스)
 
 ---
 
@@ -377,6 +375,7 @@ JWT 인증이 필요한 요청은 `Cookie: token=<JWT>` 헤더를 포함하세�
 
 <details>
 <summary><code>POST /AddRecipe</code></summary>
+
 - 설명: 레시피 추가 (이미지 최대 10장)
 - Content-Type: multipart/form-data
 - Form Data:
@@ -386,10 +385,12 @@ JWT 인증이 필요한 요청은 `Cookie: token=<JWT>` 헤더를 포함하세�
 - Responses:
   - `200 OK` `{ "message": "레시피 추가가 완료되었습니다." }`
   - `500 Internal Server Error`
+
 </details>
 
 <details>
 <summary><code>POST /updateRecipe</code></summary>
+
 - 설명: 레시피 수정 (이미지 보관 및 교체)
 - Content-Type: multipart/form-data
 - Form Data:
@@ -400,34 +401,46 @@ JWT 인증이 필요한 요청은 `Cookie: token=<JWT>` 헤더를 포함하세�
 - Responses:
   - `200 OK` `{ "message": "레시피가 수정되었습니다." }`
   - `500 Internal Server Error`
+
 </details>
 
 <details>
 <summary><code>GET /removeRecipe/:id</code></summary>
+
 - 설명: 레시피 삭제 (이미지 파일 포함)
 - Responses:
   - `200 OK` `{ "message": "레시피가 삭제되었습니다." }`
   - `500 Internal Server Error`
+
 </details>
 
 <details>
 <summary><code>GET /getRecipe/:id</code></summary>
+
 - 설명: 레시피 상세 조회 (조회수 증가)
 - Responses:
   - `200 OK`
     ```json
     {
-      "recipe": { /* RECIPES */ },
-      "description": [ /* DESCRIPTION */ ],
-      "ingredient": [ /* INGREDIENTS */ ]
+      "recipe": {
+        /* RECIPES */
+      },
+      "description": [
+        /* DESCRIPTION */
+      ],
+      "ingredient": [
+        /* INGREDIENTS */
+      ]
     }
     ```
   - `404 Not Found` `{ "message": "레시피가 존재하지않습니다." }`
   - `500 Internal Server Error`
+
 </details>
 
 <details>
 <summary><code>POST /searchRecipe</code></summary>
+
 - 설명: 레시피 검색 (제목, 반려동물, 분류)
 - Content-Type: application/json
 - Request Body:
@@ -437,23 +450,28 @@ JWT 인증이 필요한 요청은 `Cookie: token=<JWT>` 헤더를 포함하세�
 - Responses:
   - `200 OK` `{ "recipe": [ /* 배열 */ ] }`
   - `500 Internal Server Error`
+
 </details>
 
 <details>
 <summary><code>GET /getMyRecipe/:userId</code></summary>
+
 - 설명: 사용자별 레시피 목록 조회
 - Responses:
   - `200 OK` `{ "recipe": [ { "ID", "MAIN_IMAGE_URL", "TITLE", "VIEW_COUNT" }, ... ] }`
   - `404 Not Found` `{ "message": "레시피가 없습니다." }`
   - `500 Internal Server Error`
+
 </details>
 
 <details>
 <summary><code>GET /getPopularity</code></summary>
+
 - 설명: 인기있는 5개의 레시피 조회
 - Responses:
   - `200 OK` `{ "popularity": [ { "ID", "USER_ID", "TITLE", "MAIN_IMAGE_URL", "VIEW_COUNT" }, ... ] }`
   - `500 Internal Server Error`
+
 </details>
 
 ---
