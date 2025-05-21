@@ -116,6 +116,12 @@ app.post("/signUp", async (req, res) => {
             return res.status(404).json({message : "올바르지못한 형식입니다."});
         }
 
+        if(age !== '' && age < 0){
+            conn.release();
+            logger.error("올바르지못한 형식");
+            return res.status(404).json({message : "올바르지못한 형식입니다."});
+        }
+
         const hashPassword = await argon2.hash(password, {
             type : argon2.Algorithm.Argon2id,
             timeCost : Number(process.env.TIME_COST),
@@ -523,6 +529,12 @@ app.post("/addPetInfo", async (req, res) => {
     try {
         const { userId, name, type, age } = req.body;
 
+        if(age !== '' && age < 0){
+            conn.release();
+            logger.error("올바르지못한 형식");
+            return res.status(404).json({message : "올바르지못한 형식입니다."});
+        }
+
         await conn.query("INSERT INTO PETS(USER_ID, NAME, TYPE, AGE) VALUES(?, ?, ?, ?)", [userId, name, type, age ? age : null]);
 
         await conn.commit();
@@ -544,6 +556,12 @@ app.post("/UpdatePetInfo", async (req, res) => {
 
     try {
         const { id, userId, name, type, age } = req.body;
+
+        if(age !== null && age < 0){
+            conn.release();
+            logger.error("올바르지못한 형식");
+            return res.status(404).json({message : "올바르지못한 형식입니다."});
+        }
 
         await conn.query("UPDATE PETS SET NAME=?, TYPE=?, AGE=? WHERE ID=?", [name, type, age, id]);
 
@@ -697,6 +715,12 @@ app.post("/AddRecipe", upload.array('images', 10), async (req, res) => {
         const descriptionImage = urls ? urls.slice(1) : null;
         
         const {userId, nickname, title, descriptionJSON, targetPetType, foodCategory, cookingTimeLimit, level, caloriesPerServing, favoritesCount, carbs, protein, fat, calcium, phosphorus, moisture, fiber, nacl, ptss, ingredientsNameJSON, ingredientsAmountJSON, ingredientsUnitJSON} = req.body;
+
+        if(cookingTimeLimit < 0 || caloriesPerServing < 0 || carbs < 0 || protein < 0 || fat < 0 || calcium < 0 || phosphorus < 0 || moisture < 0 || fiber < 0 || nacl < 0 || ptss < 0){
+            conn.release();
+            logger.error("올바르지못한 형식");
+            return res.status(404).json({message : "올바르지못한 형식입니다."});
+        }
         await conn.query(
             "INSERT INTO RECIPES(USER_ID, NICKNAME, TITLE, MAIN_IMAGE_URL, TARGET_PET_TYPE, FOOD_CATEGORY, COOKING_TIME_LIMIT, LEVEL, CALORIES_PER_SERVING, FAVORITES_COUNT, NUTRITIONAL_INFO_CARBS_G, NUTRITIONAL_INFO_PROTEIN_G, NUTRITIONAL_INFO_FAT_G, NUTRITIONAL_INFO_CALCIUM_G, NUTRITIONAL_INFO_PHOSPHORUS_G, NUTRITIONAL_INFO_MOISTURE_PERCENT, NUTRITIONAL_INFO_FIBER_G, NUTRITIONAL_INFO_NACL_G, NUTRITIONAL_INFO_PTSS_G) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             , [userId, nickname, title, mainImage, targetPetType, foodCategory, cookingTimeLimit, level, caloriesPerServing, favoritesCount, carbs, protein, fat, calcium, phosphorus, moisture, fiber, nacl, ptss]
@@ -713,6 +737,12 @@ app.post("/AddRecipe", upload.array('images', 10), async (req, res) => {
 
         if(ingredientsName && ingredientsAmount && ingredientsUnit && ingredientsName.length === ingredientsAmount.length && ingredientsUnit.length === ingredientsAmount.length){
             for(const index in ingredientsName){
+                if(ingredientsAmount[index] < 0){
+                    await conn.rollback();
+                    conn.release();
+                    logger.error("올바르지못한 형식");
+                    return res.status(404).json({message : "올바르지못한 형식입니다."});
+                }
                 await conn.query('INSERT INTO RECIPE_INGREDIENTS(RECIPE_ID, INGREDIENT_NAME, QUANTITY_AMOUNT, QUANTITY_UNIT) VALUES(?, ?, ?, ?)', [result[0].ID, ingredientsName[index], ingredientsAmount[index], ingredientsUnit[index]]);
             }
         }
@@ -737,6 +767,12 @@ app.post("/updateRecipe", upload.array("newImages", 10), async (req, res) => {
         const recipeId = req.body.recipeId;
         const keepUrls = JSON.parse(req.body.keepUrls || '[]');
         const {userId, nickname, title, descriptionJSON, targetPetType, foodCategory, cookingTimeLimit, level, caloriesPerServing, favoritesCount, carbs, protein, fat, calcium, phosphorus, moisture, fiber, nacl, ptss, mainChange, descriptionChangeJSON, ingredientsNameJSON, ingredientsAmountJSON, ingredientsUnitJSON} = req.body;
+
+        if(cookingTimeLimit < 0 || caloriesPerServing < 0 || carbs < 0 || protein < 0 || fat < 0 || calcium < 0 || phosphorus < 0 || moisture < 0 || fiber < 0 || nacl < 0 || ptss < 0){
+            conn.release();
+            logger.error("올바르지못한 형식");
+            return res.status(404).json({message : "올바르지못한 형식입니다."});
+        }
 
         const [existing] = await conn.query("SELECT ID, FLOW, IMAGE_URL FROM DESCRIPTION WHERE RECIPE_ID=?", [recipeId]);
 
@@ -797,6 +833,12 @@ app.post("/updateRecipe", upload.array("newImages", 10), async (req, res) => {
 
         if(ingredientsName && ingredientsAmount && ingredientsUnit && ingredientsName.length === ingredientsAmount.length && ingredientsUnit.length === ingredientsAmount.length){
             for(const index in ingredientsName){
+                if(ingredientsAmount[index] < 0){
+                    await conn.rollback();
+                    conn.release();
+                    logger.error("올바르지못한 형식");
+                    return res.status(404).json({message : "올바르지못한 형식입니다."});
+                }
                 await conn.query('INSERT INTO RECIPE_INGREDIENTS(RECIPE_ID, INGREDIENT_NAME, QUANTITY_AMOUNT, QUANTITY_UNIT) VALUES(?, ?, ?, ?)', [recipeId, ingredientsName[index], ingredientsAmount[index], ingredientsUnit[index]]);
             }
         }
